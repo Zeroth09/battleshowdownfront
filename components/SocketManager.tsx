@@ -6,48 +6,48 @@ import { io, Socket } from 'socket.io-client';
 interface User {
   pemainId: string;
   nama: string;
-  email: string;
   tim: 'merah' | 'putih';
-  statistik: {
-    totalBattle: number;
-    menang: number;
-    kalah: number;
-    skor: number;
+  lokasi?: {
+    latitude: number;
+    longitude: number;
   };
 }
 
-interface BattleData {
-  battleId: string;
-  lawan: string;
-  timLawan: string;
-  pertanyaan: {
-    pertanyaan: string;
-    pilihanJawaban: {
-      a: string;
-      b: string;
-      c: string;
-      d: string;
-    };
-    jawabanBenar: string;
+interface Battle {
+  id: string;
+  pertanyaan: string;
+  pilihanJawaban: {
+    a: string;
+    b: string;
+    c: string;
+    d: string;
+  };
+  jawabanBenar: string;
+  lawan: {
+    nama: string;
+    tim: string;
   };
 }
 
 interface BattleResult {
-  pemenang: string;
-  timPemenang: string;
-  hasil: 'menang' | 'kalah';
-  instruksi: string;
+  menang: boolean;
+  pesan: string;
 }
 
 interface SocketManagerProps {
   user: User;
-  onBattleStart: (data: BattleData) => void;
+  initialLocation?: {
+    latitude: number;
+    longitude: number;
+  };
+  onBattleStart: (data: Battle) => void;
   onBattleEnd: (result: BattleResult) => void;
   onNearbyPlayers: (players: any[]) => void;
 }
 
 const SocketManager: React.FC<SocketManagerProps> = ({
   user,
+  initialLocation,
   onBattleStart,
   onBattleEnd,
   onNearbyPlayers
@@ -68,7 +68,14 @@ const SocketManager: React.FC<SocketManagerProps> = ({
       console.log('Connected to server');
       
       // Bergabung dengan tim
-      if (navigator.geolocation) {
+      if (initialLocation) {
+        socket.emit('bergabung-tim', {
+          pemainId: user.pemainId,
+          nama: user.nama,
+          tim: user.tim,
+          lokasi: initialLocation
+        });
+      } else if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const { latitude, longitude } = position.coords;
