@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
-const mongoose = require('mongoose');
+const googleSheetsService = require('./services/googleSheets');
 require('dotenv').config();
 
 const app = express();
@@ -18,16 +18,22 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/battle-games', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => {
-  console.log('✅ Database connected successfully');
-}).catch((error) => {
-  console.error('❌ Database connection error:', error);
-  console.log('⚠️ Starting without database connection...');
-});
+// Initialize Google Sheets
+async function initializeDatabase() {
+  const connected = await googleSheetsService.initialize();
+  if (connected) {
+    console.log('✅ Google Sheets connected successfully');
+    
+    // Clean up inactive players every 2 minutes
+    setInterval(async () => {
+      await googleSheetsService.clearInactivePlayers();
+    }, 120000);
+  } else {
+    console.log('⚠️ Starting without Google Sheets connection...');
+  }
+}
+
+initializeDatabase();
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -61,22 +67,42 @@ app.get('/health', (req, res) => {
 });
 
 // Debug endpoint untuk melihat pemain aktif
-app.get('/debug/pemain', (req, res) => {
-  const pemainList = Array.from(pemainAktif.entries()).map(([socketId, pemain]) => ({
-    socketId,
-    nama: pemain.nama,
-    tim: pemain.tim,
-    lokasi: pemain.lokasi
-  }));
-  
-  res.json({
-    totalPemain: pemainAktif.size,
-    pemain: pemainList
-  });
+app.get('/debug/pemain', async (req, res) => {
+  try {
+    const pemainList = Array.from(pemainAktif.entries()).map(([socketId, pemain]) => ({
+      socketId,
+      nama: pemain.nama,
+      tim: pemain.tim,
+      lokasi: pemain.lokasi
+    }));
+    
+    // Juga ambil dari Google Sheets
+    const sheetsPlayers = await googleSheetsService.getActivePlayers();
+    
+    res.json({
+      totalPemainMemory: pemainAktif.size,
+      totalPemainSheets: sheetsPlayers.length,
+      pemainMemory: pemainList,
+      pemainSheets: sheetsPlayers
+    });
+  } catch (error) {
+    res.json({
+      totalPemainMemory: pemainAktif.size,
+      totalPemainSheets: 0,
+      pemainMemory: Array.from(pemainAktif.entries()).map(([socketId, pemain]) => ({
+        socketId,
+        nama: pemain.nama,
+        tim: pemain.tim,
+        lokasi: pemain.lokasi
+      })),
+      pemainSheets: [],
+      error: error.message
+    });
+  }
 });
 
 // Socket.IO untuk deteksi pemain real-time
-const pemainAktif = new Map(); // socketId -> data pemain
+const pemainAktif = new Map(); // socketId -> data pemain (in-memory cache)
 const pertempuranAktif = new Map(); // battleId -> data pertempuran
 
 io.on('connection', (socket) => {
@@ -84,9 +110,9 @@ io.on('connection', (socket) => {
   console.log('📊 Total pemain aktif:', pemainAktif.size);
 
   // Pemain bergabung dengan tim
-  socket.on('bergabung-tim', (data) => {
+  socket.on('bergabung-tim', async (data) => {
     const { pemainId, nama, tim, lokasi } = data;
-    pemainAktif.set(socket.id, {
+    const playerData = {
       pemainId,
       nama,
       tim,
@@ -95,7 +121,11 @@ io.on('connection', (socket) => {
         longitude: lokasi.longitude,
         timestamp: Date.now()
       }
-    });
+    };
+    
+    // Simpan ke memory cache dan Google Sheets
+    pemainAktif.set(socket.id, playerData);
+    await googleSheetsService.updatePlayerLocation(socket.id, playerData);
     
     socket.join(tim); // Join room berdasarkan tim
     socket.emit('bergabung-berhasil', { tim, pemainId });
@@ -105,7 +135,7 @@ io.on('connection', (socket) => {
   });
 
   // Update lokasi pemain
-  socket.on('update-lokasi', (lokasi) => {
+  socket.on('update-lokasi', async (lokasi) => {
     const pemain = pemainAktif.get(socket.id);
     if (pemain) {
       pemain.lokasi = {
@@ -115,6 +145,9 @@ io.on('connection', (socket) => {
       };
       
       console.log(`📍 Update lokasi ${pemain.nama} (${pemain.tim}): ${lokasi.latitude}, ${lokasi.longitude}`);
+      
+      // Update ke Google Sheets
+      await googleSheetsService.updatePlayerLocation(socket.id, pemain);
       
       // Cek apakah ada pemain lawan dalam jarak 2 meter
       cekJarakPemain(socket.id, pemain);
@@ -160,11 +193,14 @@ io.on('connection', (socket) => {
   });
 
   // Disconnect
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     const pemain = pemainAktif.get(socket.id);
     if (pemain) {
       socket.to(pemain.tim).emit('pemain-keluar', { nama: pemain.nama });
       pemainAktif.delete(socket.id);
+      
+      // Remove dari Google Sheets
+      await googleSheetsService.removePlayer(socket.id);
     }
     console.log('Pemain terputus:', socket.id);
   });
@@ -214,35 +250,15 @@ function hitungJarak(lat1, lon1, lat2, lon2) {
 // Fungsi trigger battle
 async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
   try {
-    // Ambil pertanyaan random dari database
-    const Pertanyaan = require('./models/pertanyaan');
-    let pertanyaan;
-    
-    try {
-      pertanyaan = await Pertanyaan.aggregate([{ $sample: { size: 1 } }]);
-    } catch (error) {
-      console.log('⚠️ Database not available, using fallback question');
-      // Fallback pertanyaan jika database tidak tersedia
-      pertanyaan = [{
-        pertanyaan: 'Ibu kota Indonesia adalah?',
-        pilihanJawaban: {
-          a: 'Jakarta',
-          b: 'Bandung',
-          c: 'Surabaya',
-          d: 'Yogyakarta'
-        },
-        jawabanBenar: 'a'
-      }];
-    }
-    
-    if (pertanyaan.length === 0) return;
+    // Ambil pertanyaan random dari Google Sheets
+    const pertanyaan = await googleSheetsService.getRandomQuestion();
 
     const battleId = `battle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     pertempuranAktif.set(battleId, {
       pemain1: { socketId: socketId1, ...pemain1 },
       pemain2: { socketId: socketId2, ...pemain2 },
-      pertanyaan: pertanyaan[0],
+      pertanyaan: pertanyaan,
       jawaban: [],
       selesai: false,
       waktuMulai: Date.now()
@@ -253,14 +269,14 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
       battleId,
       lawan: pemain2.nama,
       timLawan: pemain2.tim,
-      pertanyaan: pertanyaan[0]
+      pertanyaan: pertanyaan
     });
 
     io.to(socketId2).emit('battle-dimulai', {
       battleId,
       lawan: pemain1.nama,
       timLawan: pemain1.tim,
-      pertanyaan: pertanyaan[0]
+      pertanyaan: pertanyaan
     });
 
     // Join kedua pemain ke room battle
