@@ -26,7 +26,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/battle-ga
   console.log('✅ Database connected successfully');
 }).catch((error) => {
   console.error('❌ Database connection error:', error);
-  process.exit(1);
+  console.log('⚠️ Starting without database connection...');
 });
 
 // Import routes
@@ -216,7 +216,24 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
   try {
     // Ambil pertanyaan random dari database
     const Pertanyaan = require('./models/pertanyaan');
-    const pertanyaan = await Pertanyaan.aggregate([{ $sample: { size: 1 } }]);
+    let pertanyaan;
+    
+    try {
+      pertanyaan = await Pertanyaan.aggregate([{ $sample: { size: 1 } }]);
+    } catch (error) {
+      console.log('⚠️ Database not available, using fallback question');
+      // Fallback pertanyaan jika database tidak tersedia
+      pertanyaan = [{
+        pertanyaan: 'Ibu kota Indonesia adalah?',
+        pilihanJawaban: {
+          a: 'Jakarta',
+          b: 'Bandung',
+          c: 'Surabaya',
+          d: 'Yogyakarta'
+        },
+        jawabanBenar: 'a'
+      }];
+    }
     
     if (pertanyaan.length === 0) return;
 
