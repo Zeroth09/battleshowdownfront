@@ -36,6 +36,25 @@ app.use('/api/pemain', playerRoutes);
 app.use('/api/battle', battleRoutes);
 app.use('/api/pertanyaan', pertanyaanRoutes);
 
+// Root route untuk health check
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Battle Showdown Backend API',
+    status: 'running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // Socket.IO untuk deteksi pemain real-time
 const pemainAktif = new Map(); // socketId -> data pemain
 const pertempuranAktif = new Map(); // battleId -> data pertempuran
@@ -140,8 +159,8 @@ function cekJarakPemain(socketId, pemain) {
       dataLawan.lokasi.latitude, dataLawan.lokasi.longitude
     );
 
-    // Jika jarak <= 1 meter, trigger battle
-    if (jarak <= 1) {
+    // Jika jarak <= 2 meter, trigger battle
+    if (jarak <= 2) {
       triggerBattle(socketId, idLawan, pemain, dataLawan);
     }
   });
@@ -211,4 +230,12 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server berjalan di port ${PORT}`);
   console.log('🚀 Sistem deteksi pemain siap!');
-}); 
+});
+
+// Export untuk testing
+module.exports = {
+  app,
+  hitungJarak,
+  triggerBattle,
+  cekJarakPemain
+}; 

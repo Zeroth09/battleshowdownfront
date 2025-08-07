@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
@@ -16,6 +16,20 @@ import {
 } from 'lucide-react';
 
 export default function HomePage() {
+  const [selectedTeam, setSelectedTeam] = useState('');
+  const [showTeamSelection, setShowTeamSelection] = useState(false);
+
+  const handleStartGame = () => {
+    if (!selectedTeam) {
+      setShowTeamSelection(true);
+      return;
+    }
+    
+    // Simpan tim ke localStorage
+    localStorage.setItem('selectedTeam', selectedTeam);
+    window.location.href = '/dashboard';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-gray-900">
       {/* Hero Section */}
@@ -40,20 +54,65 @@ export default function HomePage() {
             </h1>
             <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
               Pertempuran real-time dengan sistem deteksi pemain yang akurat. 
-              Bergabung dengan tim merah atau putih dan bertempur dalam pertanyaan seru!
+              Bertemu lawan dalam jarak 1-2 meter? Battle otomatis dimulai!
             </p>
             
+            {/* Team Selection */}
+            {showTeamSelection && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mb-8"
+              >
+                <h3 className="text-3xl font-bold text-white mb-6">Pilih Tim Kamu</h3>
+                <div className="flex flex-col sm:flex-row gap-6 justify-center">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setSelectedTeam('merah')}
+                    className={`p-8 rounded-xl border-4 transition-all ${
+                      selectedTeam === 'merah' 
+                        ? 'border-red-500 bg-red-500/20 shadow-lg shadow-red-500/50' 
+                        : 'border-red-300 bg-red-500/10 hover:bg-red-500/20'
+                    }`}
+                  >
+                    <div className="text-white">
+                      <div className="text-4xl mb-2">🔥</div>
+                      <div className="text-2xl font-bold mb-2">Tim Merah</div>
+                      <div className="text-sm opacity-80">Pasukan Api</div>
+                    </div>
+                  </motion.button>
+                  
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setSelectedTeam('putih')}
+                    className={`p-8 rounded-xl border-4 transition-all ${
+                      selectedTeam === 'putih' 
+                        ? 'border-white bg-white/20 shadow-lg shadow-white/50' 
+                        : 'border-gray-300 bg-white/10 hover:bg-white/20'
+                    }`}
+                  >
+                    <div className="text-white">
+                      <div className="text-4xl mb-2">❄️</div>
+                      <div className="text-2xl font-bold mb-2">Tim Putih</div>
+                      <div className="text-sm opacity-80">Pasukan Es</div>
+                    </div>
+                  </motion.button>
+                </div>
+              </motion.div>
+            )}
+            
             <div className="flex justify-center items-center">
-              <Link href="/dashboard">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="btn-primary text-lg px-8 py-4 flex items-center gap-2"
-                >
-                  <Play className="w-5 h-5" />
-                  Mulai Bertempur
-                </motion.button>
-              </Link>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleStartGame}
+                className="btn-primary text-lg px-8 py-4 flex items-center gap-2"
+              >
+                <Play className="w-5 h-5" />
+                {selectedTeam ? `Mulai sebagai ${selectedTeam === 'merah' ? 'Tim Merah' : 'Tim Putih'}` : 'Mulai'}
+              </motion.button>
             </div>
           </motion.div>
         </div>
@@ -110,7 +169,7 @@ export default function HomePage() {
                 Deteksi Lokasi Akurat
               </h3>
               <p className="text-gray-600">
-                Sistem GPS canggih dengan akurasi 1 meter untuk mendeteksi pemain lawan
+                Sistem GPS canggih dengan akurasi 1-2 meter untuk mendeteksi pemain lawan
               </p>
             </motion.div>
 
@@ -126,7 +185,7 @@ export default function HomePage() {
                 <Zap className="w-8 h-8 text-blue-600" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Battle Real-time
+                Battle Otomatis
               </h3>
               <p className="text-gray-600">
                 Pertempuran otomatis dengan pertanyaan seru ketika bertemu lawan
@@ -243,10 +302,10 @@ export default function HomePage() {
                 1
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Daftar & Pilih Tim
+                Pilih Tim
               </h3>
               <p className="text-gray-600">
-                Buat akun dan pilih tim merah atau putih sesuai preferensi
+                Pilih tim merah atau putih sesuai preferensi
               </p>
             </motion.div>
 
@@ -281,10 +340,10 @@ export default function HomePage() {
                 3
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Bertempur & Menang
+                Battle Otomatis
               </h3>
               <p className="text-gray-600">
-                Jawab pertanyaan dengan cepat dan akurat untuk memenangkan battle
+                Ketika bertemu lawan dalam jarak 1-2 meter, battle otomatis dimulai
               </p>
             </motion.div>
           </div>
@@ -307,16 +366,15 @@ export default function HomePage() {
               Bergabunglah dengan ribuan pemain lainnya dan buktikan keahlianmu dalam pertempuran real-time!
             </p>
             
-            <Link href="/dashboard">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-white text-red-600 font-bold py-4 px-8 rounded-lg text-lg hover:bg-gray-100 transition-all duration-200 flex items-center gap-2 mx-auto"
-              >
-                <Play className="w-5 h-5" />
-                Mulai Sekarang
-              </motion.button>
-            </Link>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleStartGame}
+              className="bg-white text-red-600 font-bold py-4 px-8 rounded-lg text-lg hover:bg-gray-100 transition-all duration-200 flex items-center gap-2 mx-auto"
+            >
+              <Play className="w-5 h-5" />
+              {selectedTeam ? `Mulai sebagai ${selectedTeam === 'merah' ? 'Tim Merah' : 'Tim Putih'}` : 'Mulai'}
+            </motion.button>
           </motion.div>
         </div>
       </section>
