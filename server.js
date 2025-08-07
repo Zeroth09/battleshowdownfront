@@ -59,11 +59,19 @@ app.get('/', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+  try {
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      googleSheets: googleSheetsService.doc ? 'connected' : 'disconnected'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
 });
 
 // Debug endpoint untuk melihat pemain aktif
@@ -292,6 +300,23 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server berjalan di port ${PORT}`);
   console.log('🚀 Sistem deteksi pemain siap!');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('📋 SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Server closed successfully');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('📋 SIGINT received, shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Server closed successfully');
+    process.exit(0);
+  });
 });
 
 // Export untuk testing
