@@ -1,5 +1,4 @@
 const { GoogleSpreadsheet } = require('google-spreadsheet');
-const { JWT } = require('google-auth-library');
 
 class GoogleSheetsService {
   constructor() {
@@ -11,20 +10,28 @@ class GoogleSheetsService {
   async initialize() {
     try {
       // Inisialisasi Google Sheets
-      const serviceAccountAuth = new JWT({
-        email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      this.doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID);
+      
+      await this.doc.useServiceAccountAuth({
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       });
 
-      this.doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID, serviceAccountAuth);
       await this.doc.loadInfo();
 
       console.log('✅ Google Sheets connected:', this.doc.title);
 
       // Load atau buat sheets
-      this.questionsSheet = this.doc.sheetsByTitle['Questions'] || await this.doc.addSheet({ title: 'Questions' });
-      this.playersSheet = this.doc.sheetsByTitle['Players'] || await this.doc.addSheet({ title: 'Players' });
+      this.questionsSheet = this.doc.sheetsByTitle['Questions'];
+      this.playersSheet = this.doc.sheetsByTitle['Players'];
+      
+      if (!this.questionsSheet) {
+        this.questionsSheet = await this.doc.addSheet({ title: 'Questions' });
+      }
+      
+      if (!this.playersSheet) {
+        this.playersSheet = await this.doc.addSheet({ title: 'Players' });
+      }
 
       // Setup headers jika sheet kosong
       await this.setupHeaders();
@@ -47,7 +54,7 @@ class GoogleSheetsService {
         ]);
       }
 
-      // Setup headers untuk Players sheet
+      // Setup headers untuk Players sheet  
       await this.playersSheet.loadHeaderRow();
       if (this.playersSheet.headerValues.length === 0) {
         await this.playersSheet.setHeaderRow([
@@ -70,17 +77,17 @@ class GoogleSheetsService {
       const randomRow = rows[Math.floor(Math.random() * rows.length)];
       
       return {
-        id: randomRow.get('id'),
-        pertanyaan: randomRow.get('pertanyaan'),
+        id: randomRow.id,
+        pertanyaan: randomRow.pertanyaan,
         pilihanJawaban: {
-          a: randomRow.get('pilihan_a'),
-          b: randomRow.get('pilihan_b'),
-          c: randomRow.get('pilihan_c'),
-          d: randomRow.get('pilihan_d')
+          a: randomRow.pilihan_a,
+          b: randomRow.pilihan_b,
+          c: randomRow.pilihan_c,
+          d: randomRow.pilihan_d
         },
-        jawabanBenar: randomRow.get('jawaban_benar'),
-        kategori: randomRow.get('kategori'),
-        tingkatKesulitan: randomRow.get('tingkat_kesulitan')
+        jawabanBenar: randomRow.jawaban_benar,
+        kategori: randomRow.kategori,
+        tingkatKesulitan: randomRow.tingkat_kesulitan
       };
     } catch (error) {
       console.error('❌ Error getting random question:', error.message);
@@ -128,7 +135,7 @@ class GoogleSheetsService {
   async updatePlayerLocation(socketId, playerData) {
     try {
       const rows = await this.playersSheet.getRows();
-      let playerRow = rows.find(row => row.get('socket_id') === socketId);
+      let playerRow = rows.find(row => row.socket_id === socketId);
 
       const playerInfo = {
         socket_id: socketId,
@@ -143,7 +150,7 @@ class GoogleSheetsService {
       if (playerRow) {
         // Update existing player
         Object.keys(playerInfo).forEach(key => {
-          playerRow.set(key, playerInfo[key]);
+          playerRow[key] = playerInfo[key];
         });
         await playerRow.save();
       } else {
@@ -164,21 +171,21 @@ class GoogleSheetsService {
       const players = [];
 
       for (const row of rows) {
-        const timestamp = new Date(row.get('timestamp'));
+        const timestamp = new Date(row.timestamp);
         const now = new Date();
         const timeDiff = (now - timestamp) / 1000; // seconds
 
         // Consider player active if updated within last 30 seconds
         if (timeDiff <= 30) {
           players.push({
-            socketId: row.get('socket_id'),
-            nama: row.get('nama'),
-            tim: row.get('tim'),
+            socketId: row.socket_id,
+            nama: row.nama,
+            tim: row.tim,
             lokasi: {
-              latitude: parseFloat(row.get('latitude')) || 0,
-              longitude: parseFloat(row.get('longitude')) || 0
+              latitude: parseFloat(row.latitude) || 0,
+              longitude: parseFloat(row.longitude) || 0
             },
-            timestamp: row.get('timestamp')
+            timestamp: row.timestamp
           });
         }
       }
@@ -193,7 +200,7 @@ class GoogleSheetsService {
   async removePlayer(socketId) {
     try {
       const rows = await this.playersSheet.getRows();
-      const playerRow = rows.find(row => row.get('socket_id') === socketId);
+      const playerRow = rows.find(row => row.socket_id === socketId);
       
       if (playerRow) {
         await playerRow.delete();
@@ -212,7 +219,7 @@ class GoogleSheetsService {
       const now = new Date();
 
       for (const row of rows) {
-        const timestamp = new Date(row.get('timestamp'));
+        const timestamp = new Date(row.timestamp);
         const timeDiff = (now - timestamp) / 1000; // seconds
 
         // Remove players inactive for more than 1 minute
