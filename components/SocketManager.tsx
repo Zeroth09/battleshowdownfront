@@ -65,7 +65,7 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
 
     // Event listeners
     socket.on('connect', () => {
-      console.log('Connected to server');
+      console.log('🟢 Connected to server:', socket.id);
       
       // Bergabung dengan tim
       if (initialLocation) {
@@ -101,20 +101,20 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
     });
 
     socket.on('bergabung-berhasil', (data) => {
-      console.log('Berhasil bergabung dengan tim:', data);
+      console.log('✅ Berhasil bergabung dengan tim:', data);
     });
 
     socket.on('pemain-baru', (data) => {
-      console.log('Pemain baru bergabung:', data);
+      console.log('👤 Pemain baru bergabung:', data);
     });
 
     socket.on('battle-dimulai', (data) => {
-      console.log('Battle dimulai:', data);
+      console.log('⚔️ Battle dimulai:', data);
       onBattleStart(data);
     });
 
     socket.on('battle-selesai', (data) => {
-      console.log('Battle selesai:', data);
+      console.log('🏁 Battle selesai:', data);
       onBattleEnd(data);
     });
 
@@ -139,17 +139,19 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
 
   const startLocationTracking = () => {
     if (navigator.geolocation) {
+      console.log('📍 Starting location tracking...');
       // Update lokasi setiap 5 detik
       locationIntervalRef.current = setInterval(() => {
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const { latitude, longitude } = position.coords;
+            console.log(`📍 Location update: ${latitude}, ${longitude}`);
             if (socketRef.current) {
               socketRef.current.emit('update-lokasi', { latitude, longitude });
             }
           },
           (error) => {
-            console.error('Error updating location:', error);
+            console.error('❌ Error updating location:', error);
           }
         );
       }, 5000);
