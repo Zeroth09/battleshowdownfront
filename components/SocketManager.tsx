@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useImperativeHandle } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 interface User {
@@ -45,13 +45,13 @@ interface SocketManagerProps {
   onNearbyPlayers: (players: any[]) => void;
 }
 
-const SocketManager: React.FC<SocketManagerProps> = ({
+const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer: string) => void }, SocketManagerProps>(({
   user,
   initialLocation,
   onBattleStart,
   onBattleEnd,
   onNearbyPlayers
-}) => {
+}, ref) => {
   const socketRef = useRef<Socket | null>(null);
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -167,10 +167,11 @@ const SocketManager: React.FC<SocketManagerProps> = ({
   };
 
   // Expose submitAnswer function untuk digunakan di parent component
-  const submitAnswerRef = React.useRef(submitAnswer);
-  submitAnswerRef.current = submitAnswer;
+  useImperativeHandle(ref, () => ({
+    submitAnswer
+  }));
 
   return null; // Component ini tidak render apapun
-};
+});
 
 export default SocketManager; 
