@@ -60,12 +60,28 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint untuk melihat pemain aktif
+app.get('/debug/pemain', (req, res) => {
+  const pemainList = Array.from(pemainAktif.entries()).map(([socketId, pemain]) => ({
+    socketId,
+    nama: pemain.nama,
+    tim: pemain.tim,
+    lokasi: pemain.lokasi
+  }));
+  
+  res.json({
+    totalPemain: pemainAktif.size,
+    pemain: pemainList
+  });
+});
+
 // Socket.IO untuk deteksi pemain real-time
 const pemainAktif = new Map(); // socketId -> data pemain
 const pertempuranAktif = new Map(); // battleId -> data pertempuran
 
 io.on('connection', (socket) => {
-  console.log('Pemain terhubung:', socket.id);
+  console.log('🟢 Pemain terhubung:', socket.id);
+  console.log('📊 Total pemain aktif:', pemainAktif.size);
 
   // Pemain bergabung dengan tim
   socket.on('bergabung-tim', (data) => {
@@ -98,7 +114,9 @@ io.on('connection', (socket) => {
         timestamp: Date.now()
       };
       
-      // Cek apakah ada pemain lawan dalam jarak 1 meter
+      console.log(`📍 Update lokasi ${pemain.nama} (${pemain.tim}): ${lokasi.latitude}, ${lokasi.longitude}`);
+      
+      // Cek apakah ada pemain lawan dalam jarak 2 meter
       cekJarakPemain(socket.id, pemain);
     }
   });
@@ -158,14 +176,20 @@ function cekJarakPemain(socketId, pemain) {
   const pemainLawan = Array.from(pemainAktif.entries())
     .filter(([id, data]) => data.tim === timLawan && id !== socketId);
 
+  console.log(`🔍 Cek jarak untuk ${pemain.nama} (${pemain.tim})`);
+  console.log(`👥 Pemain lawan yang ditemukan: ${pemainLawan.length}`);
+
   pemainLawan.forEach(([idLawan, dataLawan]) => {
     const jarak = hitungJarak(
       pemain.lokasi.latitude, pemain.lokasi.longitude,
       dataLawan.lokasi.latitude, dataLawan.lokasi.longitude
     );
 
+    console.log(`📏 Jarak ${pemain.nama} vs ${dataLawan.nama}: ${jarak.toFixed(2)} meter`);
+
     // Jika jarak <= 2 meter, trigger battle
     if (jarak <= 2) {
+      console.log(`⚔️ BATTLE TRIGGERED! ${pemain.nama} vs ${dataLawan.nama} (${jarak.toFixed(2)}m)`);
       triggerBattle(socketId, idLawan, pemain, dataLawan);
     }
   });
