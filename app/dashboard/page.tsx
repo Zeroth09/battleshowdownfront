@@ -192,6 +192,14 @@ export default function DashboardPage() {
       return;
     }
     
+    // Validate battleId is not test_battle
+    if (battleData.id === 'test_battle') {
+      console.error('❌ Invalid battleId: test_battle');
+      return;
+    }
+    
+    console.log('🎯 Using battleId:', battleData.id);
+    
     // Try multiple ways to get submitAnswer function
     let submitAnswerFunc = null;
     
