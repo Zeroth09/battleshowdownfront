@@ -69,14 +69,27 @@ class GoogleSheetsService {
   // Questions methods
   async getRandomQuestion() {
     try {
+      console.log('📝 Getting random question from Google Sheets...');
       const rows = await this.questionsSheet.getRows();
+      console.log('📝 Total rows in Google Sheets:', rows.length);
+      
       if (rows.length === 0) {
+        console.log('📝 No rows found, using fallback question');
         return this.getFallbackQuestion();
       }
 
       const randomRow = rows[Math.floor(Math.random() * rows.length)];
+      console.log('📝 Selected random row:', {
+        id: randomRow.id,
+        pertanyaan: randomRow.pertanyaan,
+        pilihan_a: randomRow.pilihan_a,
+        pilihan_b: randomRow.pilihan_b,
+        pilihan_c: randomRow.pilihan_c,
+        pilihan_d: randomRow.pilihan_d,
+        jawaban_benar: randomRow.jawaban_benar
+      });
       
-      return {
+      const question = {
         id: randomRow.id,
         pertanyaan: randomRow.pertanyaan,
         pilihanJawaban: {
@@ -89,8 +102,12 @@ class GoogleSheetsService {
         kategori: randomRow.kategori,
         tingkatKesulitan: randomRow.tingkat_kesulitan
       };
+      
+      console.log('📝 Returning question:', question);
+      return question;
     } catch (error) {
       console.error('❌ Error getting random question:', error.message);
+      console.log('📝 Using fallback question due to error');
       return this.getFallbackQuestion();
     }
   }
