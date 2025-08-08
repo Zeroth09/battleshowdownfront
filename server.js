@@ -392,7 +392,21 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
     // Validate pertanyaan data
     if (!pertanyaan.pilihanJawaban || Object.keys(pertanyaan.pilihanJawaban).length === 0) {
       console.error('❌ Pertanyaan tidak valid:', pertanyaan);
-      return;
+      console.log('🔄 Using fallback question...');
+      let fallbackPertanyaan = {
+        id: 'fallback_1',
+        pertanyaan: 'Ibu kota Indonesia adalah?',
+        pilihanJawaban: {
+          a: 'Jakarta',
+          b: 'Bandung', 
+          c: 'Surabaya',
+          d: 'Yogyakarta'
+        },
+        jawabanBenar: 'a',
+        kategori: 'umum',
+        tingkatKesulitan: 'mudah'
+      };
+      pertanyaan = fallbackPertanyaan;
     }
 
     const battleData = {
