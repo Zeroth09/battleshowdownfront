@@ -106,11 +106,18 @@ export default function DashboardPage() {
   }, []);
 
   const handleBattleStart = (battleData: Battle) => {
+    console.log('🎯 handleBattleStart called with:', battleData);
+    
     // Validate battle data before setting
     if (battleData && battleData.pilihanJawaban && typeof battleData.pilihanJawaban === 'object') {
+      console.log('✅ Setting activeBattle with valid data');
       setActiveBattle(battleData);
+      
+      // Store battle data in localStorage as backup
+      localStorage.setItem('currentBattle', JSON.stringify(battleData));
+      console.log('✅ Battle data stored in localStorage');
     } else {
-      console.error('Invalid battle data:', battleData);
+      console.error('❌ Invalid battle data:', battleData);
     }
   };
 
@@ -165,6 +172,26 @@ export default function DashboardPage() {
     console.log('🎯 socketManagerReady:', socketManagerReady);
     console.log('🎯 socketManagerInstance:', socketManagerInstance);
     
+    // Get battle data from state or localStorage backup
+    let battleData = activeBattle;
+    if (!battleData || !battleData.pilihanJawaban || Object.keys(battleData.pilihanJawaban).length === 0) {
+      console.log('🔄 activeBattle is empty, trying localStorage backup...');
+      const storedBattle = localStorage.getItem('currentBattle');
+      if (storedBattle) {
+        try {
+          battleData = JSON.parse(storedBattle);
+          console.log('✅ Retrieved battle data from localStorage:', battleData);
+        } catch (error) {
+          console.error('❌ Error parsing stored battle data:', error);
+        }
+      }
+    }
+    
+    if (!battleData || !battleData.id) {
+      console.error('❌ No valid battle data found');
+      return;
+    }
+    
     // Try multiple ways to get submitAnswer function
     let submitAnswerFunc = null;
     
@@ -178,7 +205,7 @@ export default function DashboardPage() {
     
     if (submitAnswerFunc && socketManagerReady) {
       console.log('🎯 Calling submitAnswer...');
-      submitAnswerFunc(activeBattle?.id || '', answer);
+      submitAnswerFunc(battleData.id, answer);
     } else {
       console.error('❌ submitAnswer function not available');
       console.error('❌ socketManagerRef.current:', socketManagerRef.current);
@@ -190,7 +217,7 @@ export default function DashboardPage() {
       if (typeof window !== 'undefined' && (window as any).socket) {
         console.log('🎯 Using window.socket fallback');
         (window as any).socket.emit('jawab-battle', {
-          battleId: activeBattle?.id || '',
+          battleId: battleData.id,
           jawaban: answer,
           pemainId: user?.pemainId
         });
@@ -204,7 +231,7 @@ export default function DashboardPage() {
         if (socket && socket.emit) {
           console.log('🎯 Using last resort socket');
           socket.emit('jawab-battle', {
-            battleId: activeBattle?.id || '',
+            battleId: battleData.id,
             jawaban: answer,
             pemainId: user?.pemainId
           });
