@@ -280,7 +280,16 @@ io.on('connection', (socket) => {
       // Hapus battle dari memory
       pertempuranAktif.delete(battleId);
       
+      // Cleanup battle locks
+      const lockKeys = Array.from(battleLocks.keys());
+      lockKeys.forEach(key => {
+        if (key.includes(battleId.split('_')[1])) {
+          battleLocks.delete(key);
+        }
+      });
+      
       console.log(`🏆 Battle ${battleId} selesai. Pemenang: ${pemenang}`);
+      console.log(`📊 Total battles active: ${pertempuranAktif.size}`);
     }
   });
 
