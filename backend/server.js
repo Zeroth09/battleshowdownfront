@@ -112,6 +112,8 @@ app.get('/debug/pemain', async (req, res) => {
 // Socket.IO untuk deteksi pemain real-time
 const pemainAktif = new Map(); // socketId -> data pemain (in-memory cache)
 const pertempuranAktif = new Map(); // battleId -> data pertempuran
+const battleLocks = new Set(); // Mencegah multiple battle triggers
+const locationUpdateTimers = new Map(); // Debounce untuk update location ke Google Sheets
 
 io.on('connection', (socket) => {
   console.log('🟢 Pemain terhubung:', socket.id);
@@ -131,9 +133,16 @@ io.on('connection', (socket) => {
       }
     };
     
-    // Simpan ke memory cache dan Google Sheets
+    // Simpan ke memory cache
     pemainAktif.set(socket.id, playerData);
-    await googleSheetsService.updatePlayerLocation(socket.id, playerData);
+    
+    // Update ke Google Sheets dengan error handling
+    try {
+      await googleSheetsService.updatePlayerLocation(socket.id, playerData);
+      console.log(`📊 Added ${nama} to Google Sheets`);
+    } catch (error) {
+      console.error(`❌ Error adding ${nama} to Google Sheets:`, error.message);
+    }
     
     socket.join(tim); // Join room berdasarkan tim
     socket.emit('bergabung-berhasil', { tim, pemainId });
@@ -154,49 +163,133 @@ io.on('connection', (socket) => {
       
       console.log(`📍 Update lokasi ${pemain.nama} (${pemain.tim}): ${lokasi.latitude}, ${lokasi.longitude}`);
       
-      // Update ke Google Sheets
-      await googleSheetsService.updatePlayerLocation(socket.id, pemain);
+      // Debounce update ke Google Sheets (hanya update setiap 30 detik)
+      if (locationUpdateTimers.has(socket.id)) {
+        clearTimeout(locationUpdateTimers.get(socket.id));
+      }
+      
+      locationUpdateTimers.set(socket.id, setTimeout(async () => {
+        try {
+          await googleSheetsService.updatePlayerLocation(socket.id, pemain);
+          console.log(`📊 Updated ${pemain.nama} location to Google Sheets`);
+        } catch (error) {
+          console.error(`❌ Error updating ${pemain.nama} location to Google Sheets:`, error.message);
+        }
+      }, 30000)); // 30 detik debounce
       
       // Cek apakah ada pemain lawan dalam jarak 2 meter
       cekJarakPemain(socket.id, pemain);
     }
   });
 
-  // Jawaban pertanyaan battle
-  socket.on('jawab-pertanyaan', (data) => {
-    const { battleId, jawaban, waktuJawab } = data;
-    const pertempuran = pertempuranAktif.get(battleId);
+  // Handle jawaban battle
+  socket.on('jawab-battle', (data) => {
+    console.log('📝 Received jawab-battle event:', data);
+    const { battleId, jawaban, pemainId } = data;
+    const battle = pertempuranAktif.get(battleId);
     
-    if (pertempuran && !pertempuran.selesai) {
-      const pemain = pemainAktif.get(socket.id);
-      if (pemain) {
-        // Cek jawaban
-        const benar = pertempuran.pertanyaan.jawabanBenar === jawaban;
-        const waktuTercepat = pertempuran.jawaban.length === 0;
-        
-        pertempuran.jawaban.push({
-          pemainId: pemain.pemainId,
-          nama: pemain.nama,
-          tim: pemain.tim,
-          jawaban,
-          benar,
-          waktuJawab
-        });
+    console.log('📝 Battle found:', battle ? 'yes' : 'no');
+    console.log('📝 Battle selesai:', battle?.selesai);
+    console.log('📝 Total battles active:', pertempuranAktif.size);
+    
+    if (!battle || battle.selesai) {
+      console.log('❌ Battle not found or already finished');
+      return;
+    }
 
-        // Jika ada yang jawab duluan
-        if (pertempuran.jawaban.length === 1) {
-          const hasil = benar ? 'menang' : 'kalah';
-          io.to(battleId).emit('battle-selesai', {
-            pemenang: pemain.nama,
-            timPemenang: pemain.tim,
-            hasil,
-            instruksi: benar ? 'Lanjutkan perjalanan!' : 'Kembali ke awal!'
-          });
-          
-          pertempuran.selesai = true;
-          pertempuranAktif.delete(battleId);
+    console.log(`📝 ${pemainId} menjawab: ${jawaban} untuk battle ${battleId}`);
+    console.log(`📝 Current answers in battle:`, battle.jawaban);
+
+    // Tambah jawaban ke battle
+    battle.jawaban.push({
+      pemainId,
+      jawaban,
+      waktu: Date.now()
+    });
+
+    console.log(`📝 Total answers now: ${battle.jawaban.length}`);
+
+    // Cek apakah ini jawaban pertama
+    if (battle.jawaban.length === 1) {
+      // Jawaban pertama - tunggu jawaban kedua
+      console.log(`⏳ Menunggu jawaban kedua untuk battle ${battleId}`);
+    } else if (battle.jawaban.length === 2) {
+      // Kedua pemain sudah jawab - tentukan pemenang
+      console.log(`🏁 Kedua pemain sudah jawab, menentukan pemenang...`);
+      
+      const jawaban1 = battle.jawaban[0];
+      const jawaban2 = battle.jawaban[1];
+      
+      const pertanyaan = battle.pertanyaan;
+      const jawabanBenar = pertanyaan.jawabanBenar;
+      
+      console.log(`📊 Jawaban 1: ${jawaban1.jawaban} (${jawaban1.pemainId})`);
+      console.log(`📊 Jawaban 2: ${jawaban2.jawaban} (${jawaban2.pemainId})`);
+      console.log(`📊 Jawaban benar: ${jawabanBenar}`);
+      
+      // Tentukan pemenang berdasarkan kecepatan dan kebenaran
+      let pemenang = null;
+      let pesan = '';
+      
+      if (jawaban1.jawaban === jawabanBenar && jawaban2.jawaban !== jawabanBenar) {
+        // Pemain 1 benar, pemain 2 salah
+        pemenang = jawaban1.pemainId;
+        pesan = 'Jawaban cepat dan benar!';
+      } else if (jawaban2.jawaban === jawabanBenar && jawaban1.jawaban !== jawabanBenar) {
+        // Pemain 2 benar, pemain 1 salah
+        pemenang = jawaban2.pemainId;
+        pesan = 'Jawaban cepat dan benar!';
+      } else if (jawaban1.jawaban === jawabanBenar && jawaban2.jawaban === jawabanBenar) {
+        // Keduanya benar - yang lebih cepat menang
+        if (jawaban1.waktu < jawaban2.waktu) {
+          pemenang = jawaban1.pemainId;
+          pesan = 'Jawaban cepat dan benar!';
+        } else {
+          pemenang = jawaban2.pemainId;
+          pesan = 'Jawaban cepat dan benar!';
+        }
+      } else {
+        // Keduanya salah - yang lebih cepat "menang" (tapi tetap kalah)
+        if (jawaban1.waktu < jawaban2.waktu) {
+          pemenang = jawaban1.pemainId;
+          pesan = 'Jawaban cepat tapi salah!';
+        } else {
+          pemenang = jawaban2.pemainId;
+          pesan = 'Jawaban cepat tapi salah!';
         }
       }
+
+      console.log(`🏆 Pemenang: ${pemenang}, Pesan: ${pesan}`);
+
+      // Tandai battle selesai
+      battle.selesai = true;
+      battle.pemenang = pemenang;
+      battle.pesan = pesan;
+
+      // Kirim hasil ke kedua pemain
+      const hasilBattle = {
+        pemenang,
+        pesan,
+        jawabanBenar,
+        jawabanPemain: battle.jawaban
+      };
+
+      console.log('📤 Sending battle-selesai to players:', hasilBattle);
+      io.to(battleId).emit('battle-selesai', hasilBattle);
+      
+      // Hapus battle dari memory
+      pertempuranAktif.delete(battleId);
+      
+      // Cleanup battle locks
+      const lockKeys = Array.from(battleLocks.keys());
+      lockKeys.forEach(key => {
+        if (key.includes(battleId.split('_')[1])) {
+          battleLocks.delete(key);
+        }
+      });
+      
+      console.log(`🏆 Battle ${battleId} selesai. Pemenang: ${pemenang}`);
+      console.log(`📊 Total battles active: ${pertempuranAktif.size}`);
     }
   });
 
@@ -233,8 +326,34 @@ function cekJarakPemain(socketId, pemain) {
 
     // Jika jarak <= 2 meter, trigger battle
     if (jarak <= 2) {
-      console.log(`⚔️ BATTLE TRIGGERED! ${pemain.nama} vs ${dataLawan.nama} (${jarak.toFixed(2)}m)`);
-      triggerBattle(socketId, idLawan, pemain, dataLawan);
+      // Buat lock key untuk mencegah multiple triggers
+      const lockKey = [socketId, idLawan].sort().join('_');
+      
+      // Cek apakah sudah ada battle aktif atau lock
+      const existingBattle = Array.from(pertempuranAktif.values()).find(battle => 
+        battle.pemain1.socketId === socketId || battle.pemain2.socketId === socketId ||
+        battle.pemain1.socketId === idLawan || battle.pemain2.socketId === idLawan
+      );
+      
+      if (!existingBattle && !battleLocks.has(lockKey)) {
+        console.log(`⚔️ BATTLE TRIGGERED! ${pemain.nama} vs ${dataLawan.nama} (${jarak.toFixed(2)}m)`);
+        console.log(`📊 Total battles before trigger: ${pertempuranAktif.size}`);
+        
+        // Set lock untuk mencegah multiple triggers
+        battleLocks.add(lockKey);
+        
+        // Clear lock setelah 5 detik
+        setTimeout(() => {
+          battleLocks.delete(lockKey);
+        }, 5000);
+        
+        triggerBattle(socketId, idLawan, pemain, dataLawan);
+      } else {
+        console.log(`⏸️ Battle sudah aktif atau locked untuk ${pemain.nama}, skip trigger`);
+        if (existingBattle) {
+          console.log(`📊 Existing battle found for ${pemain.nama}`);
+        }
+      }
     }
   });
 }
@@ -260,6 +379,8 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
   try {
     // Ambil pertanyaan random dari Google Sheets
     const pertanyaan = await googleSheetsService.getRandomQuestion();
+    
+    console.log('📝 Pertanyaan dari Google Sheets:', pertanyaan);
 
     const battleId = `battle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -272,8 +393,36 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
       waktuMulai: Date.now()
     });
 
-    // Kirim battle ke kedua pemain dengan format yang benar
-    io.to(socketId1).emit('battle-dimulai', {
+    // Auto-clear battle setelah 30 detik jika tidak selesai
+    setTimeout(() => {
+      const battle = pertempuranAktif.get(battleId);
+      if (battle && !battle.selesai) {
+        console.log(`⏰ Battle ${battleId} timeout, clearing...`);
+        pertempuranAktif.delete(battleId);
+      }
+    }, 30000);
+
+    // Validate pertanyaan data
+    if (!pertanyaan.pilihanJawaban || Object.keys(pertanyaan.pilihanJawaban).length === 0) {
+      console.error('❌ Pertanyaan tidak valid:', pertanyaan);
+      console.log('🔄 Using fallback question...');
+      let fallbackPertanyaan = {
+        id: 'fallback_1',
+        pertanyaan: 'Ibu kota Indonesia adalah?',
+        pilihanJawaban: {
+          a: 'Jakarta',
+          b: 'Bandung', 
+          c: 'Surabaya',
+          d: 'Yogyakarta'
+        },
+        jawabanBenar: 'a',
+        kategori: 'umum',
+        tingkatKesulitan: 'mudah'
+      };
+      pertanyaan = fallbackPertanyaan;
+    }
+
+    const battleData = {
       id: battleId,
       pertanyaan: pertanyaan.pertanyaan,
       pilihanJawaban: pertanyaan.pilihanJawaban,
@@ -284,20 +433,13 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
         nama: pemain2.nama,
         tim: pemain2.tim
       }
-    });
+    };
 
-    io.to(socketId2).emit('battle-dimulai', {
-      id: battleId,
-      pertanyaan: pertanyaan.pertanyaan,
-      pilihanJawaban: pertanyaan.pilihanJawaban,
-      jawabanBenar: pertanyaan.jawabanBenar,
-      kategori: pertanyaan.kategori,
-      tingkatKesulitan: pertanyaan.tingkatKesulitan,
-      lawan: {
-        nama: pemain1.nama,
-        tim: pemain1.tim
-      }
-    });
+    console.log('📤 Sending battle data to players:', battleData);
+
+    // Kirim battle ke kedua pemain dengan format yang benar
+    io.to(socketId1).emit('battle-dimulai', battleData);
+    io.to(socketId2).emit('battle-dimulai', battleData);
 
     // Join kedua pemain ke room battle
     io.sockets.sockets.get(socketId1)?.join(battleId);
@@ -310,89 +452,7 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
   }
 }
 
-// Handle jawaban battle
-socket.on('jawab-battle', (data) => {
-  const { battleId, jawaban, pemainId } = data;
-  const battle = pertempuranAktif.get(battleId);
-  
-  if (!battle || battle.selesai) {
-    return;
-  }
 
-  console.log(`📝 ${pemainId} menjawab: ${jawaban} untuk battle ${battleId}`);
-
-  // Tambah jawaban ke battle
-  battle.jawaban.push({
-    pemainId,
-    jawaban,
-    waktu: Date.now()
-  });
-
-  // Cek apakah ini jawaban pertama
-  if (battle.jawaban.length === 1) {
-    // Jawaban pertama - tunggu jawaban kedua
-    console.log(`⏳ Menunggu jawaban kedua untuk battle ${battleId}`);
-  } else if (battle.jawaban.length === 2) {
-    // Kedua pemain sudah jawab - tentukan pemenang
-    const jawaban1 = battle.jawaban[0];
-    const jawaban2 = battle.jawaban[1];
-    
-    const pertanyaan = battle.pertanyaan;
-    const jawabanBenar = pertanyaan.jawabanBenar;
-    
-    // Tentukan pemenang berdasarkan kecepatan dan kebenaran
-    let pemenang = null;
-    let pesan = '';
-    
-    if (jawaban1.jawaban === jawabanBenar && jawaban2.jawaban !== jawabanBenar) {
-      // Pemain 1 benar, pemain 2 salah
-      pemenang = jawaban1.pemainId;
-      pesan = 'Jawaban cepat dan benar!';
-    } else if (jawaban2.jawaban === jawabanBenar && jawaban1.jawaban !== jawabanBenar) {
-      // Pemain 2 benar, pemain 1 salah
-      pemenang = jawaban2.pemainId;
-      pesan = 'Jawaban cepat dan benar!';
-    } else if (jawaban1.jawaban === jawabanBenar && jawaban2.jawaban === jawabanBenar) {
-      // Keduanya benar - yang lebih cepat menang
-      if (jawaban1.waktu < jawaban2.waktu) {
-        pemenang = jawaban1.pemainId;
-        pesan = 'Jawaban cepat dan benar!';
-      } else {
-        pemenang = jawaban2.pemainId;
-        pesan = 'Jawaban cepat dan benar!';
-      }
-    } else {
-      // Keduanya salah - yang lebih cepat "menang" (tapi tetap kalah)
-      if (jawaban1.waktu < jawaban2.waktu) {
-        pemenang = jawaban1.pemainId;
-        pesan = 'Jawaban cepat tapi salah!';
-      } else {
-        pemenang = jawaban2.pemainId;
-        pesan = 'Jawaban cepat tapi salah!';
-      }
-    }
-
-    // Tandai battle selesai
-    battle.selesai = true;
-    battle.pemenang = pemenang;
-    battle.pesan = pesan;
-
-    // Kirim hasil ke kedua pemain
-    const hasilBattle = {
-      pemenang,
-      pesan,
-      jawabanBenar,
-      jawabanPemain: battle.jawaban
-    };
-
-    io.to(battleId).emit('battle-selesai', hasilBattle);
-    
-    // Hapus battle dari memory
-    pertempuranAktif.delete(battleId);
-    
-    console.log(`🏆 Battle ${battleId} selesai. Pemenang: ${pemenang}`);
-  }
-});
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {

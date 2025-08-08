@@ -111,11 +111,15 @@ export default function DashboardPage() {
     // Validate battle data before setting
     if (battleData && battleData.pilihanJawaban && typeof battleData.pilihanJawaban === 'object') {
       console.log('✅ Setting activeBattle with valid data');
+      console.log('🎯 Battle ID:', battleData.id);
       setActiveBattle(battleData);
       
       // Store battle data in localStorage as backup
       localStorage.setItem('currentBattle', JSON.stringify(battleData));
       console.log('✅ Battle data stored in localStorage');
+      
+      // Clear any old battle data
+      localStorage.removeItem('oldBattle');
     } else {
       console.error('❌ Invalid battle data:', battleData);
     }
@@ -199,6 +203,8 @@ export default function DashboardPage() {
     }
     
     console.log('🎯 Using battleId:', battleData.id);
+    console.log('🎯 Current activeBattle ID:', activeBattle?.id);
+    console.log('🎯 Battle data ID:', battleData.id);
     
     // Try multiple ways to get submitAnswer function
     let submitAnswerFunc = null;
