@@ -48,6 +48,12 @@ export default function BluetoothProximity({
     try {
       onStatusChange('Meminta izin Bluetooth...');
       
+      // Check if Bluetooth is available
+      if (!navigator.bluetooth) {
+        onError('Bluetooth tidak tersedia');
+        return false;
+      }
+      
       // Request Bluetooth device to trigger permission
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
@@ -108,6 +114,12 @@ export default function BluetoothProximity({
 
   const scanForDevices = async () => {
     try {
+      // Check if Bluetooth is available
+      if (!navigator.bluetooth) {
+        onError('Bluetooth tidak tersedia');
+        return;
+      }
+      
       // Request device with specific filters
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
