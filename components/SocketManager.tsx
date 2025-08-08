@@ -165,7 +165,7 @@ const SocketManager = forwardRef<SocketManagerRef, SocketManagerProps>(
           throw new Error('Socket not connected');
         }
         
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
           socket.emit('jawab-battle', {
             battleId,
             jawaban: answer,
@@ -217,7 +217,7 @@ const SocketManager = forwardRef<SocketManagerRef, SocketManagerProps>(
           submitAnswer: async (battleId: string, answer: string) => {
             if (!socket) throw new Error('Socket not connected');
             
-            return new Promise((resolve, reject) => {
+            return new Promise<void>((resolve, reject) => {
               socket.emit('jawab-battle', {
                 battleId,
                 jawaban: answer,

@@ -31,11 +31,7 @@ interface Battle {
   };
 }
 
-interface LombaPageProps {
-  onReady?: () => void;
-}
-
-const LombaPage: React.FC<LombaPageProps> = ({ onReady }) => {
+const LombaPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeBattle, setActiveBattle] = useState<Battle | null>(null);
   const [battleStatus, setBattleStatus] = useState<string>('Menunggu Pertanyaan');
@@ -144,7 +140,6 @@ const LombaPage: React.FC<LombaPageProps> = ({ onReady }) => {
 
   const handleSocketReady = () => {
     setSocketManagerReady(true);
-    if (onReady) onReady();
   };
 
   const handleSocketManagerRef = (ref: any) => {
