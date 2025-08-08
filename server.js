@@ -112,6 +112,7 @@ app.get('/debug/pemain', async (req, res) => {
 // Socket.IO untuk deteksi pemain real-time
 const pemainAktif = new Map(); // socketId -> data pemain (in-memory cache)
 const pertempuranAktif = new Map(); // battleId -> data pertempuran
+const battleLocks = new Set(); // Mencegah multiple battle triggers
 
 io.on('connection', (socket) => {
   console.log('🟢 Pemain terhubung:', socket.id);
@@ -279,17 +280,29 @@ function cekJarakPemain(socketId, pemain) {
 
     // Jika jarak <= 2 meter, trigger battle
     if (jarak <= 2) {
-      // Cek apakah sudah ada battle aktif untuk pemain ini
+      // Buat lock key untuk mencegah multiple triggers
+      const lockKey = [socketId, idLawan].sort().join('_');
+      
+      // Cek apakah sudah ada battle aktif atau lock
       const existingBattle = Array.from(pertempuranAktif.values()).find(battle => 
         battle.pemain1.socketId === socketId || battle.pemain2.socketId === socketId ||
         battle.pemain1.socketId === idLawan || battle.pemain2.socketId === idLawan
       );
       
-      if (!existingBattle) {
+      if (!existingBattle && !battleLocks.has(lockKey)) {
         console.log(`⚔️ BATTLE TRIGGERED! ${pemain.nama} vs ${dataLawan.nama} (${jarak.toFixed(2)}m)`);
+        
+        // Set lock untuk mencegah multiple triggers
+        battleLocks.add(lockKey);
+        
+        // Clear lock setelah 5 detik
+        setTimeout(() => {
+          battleLocks.delete(lockKey);
+        }, 5000);
+        
         triggerBattle(socketId, idLawan, pemain, dataLawan);
       } else {
-        console.log(`⏸️ Battle sudah aktif untuk ${pemain.nama}, skip trigger`);
+        console.log(`⏸️ Battle sudah aktif atau locked untuk ${pemain.nama}, skip trigger`);
       }
     }
   });
