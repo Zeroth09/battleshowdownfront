@@ -43,6 +43,7 @@ interface SocketManagerProps {
   onBattleStart: (data: Battle) => void;
   onBattleEnd: (result: BattleResult) => void;
   onNearbyPlayers: (players: any[]) => void;
+  onReady?: () => void;
 }
 
 const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer: string) => void }, SocketManagerProps>(({
@@ -50,7 +51,8 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
   initialLocation,
   onBattleStart,
   onBattleEnd,
-  onNearbyPlayers
+  onNearbyPlayers,
+  onReady
 }, ref) => {
   const socketRef = useRef<Socket | null>(null);
   const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -130,13 +132,20 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
     // Start location tracking
     startLocationTracking();
 
+    // Call onReady when component is ready
+    if (onReady) {
+      setTimeout(() => {
+        onReady();
+      }, 1000); // Give some time for socket to connect
+    }
+
     return () => {
       if (locationIntervalRef.current) {
         clearInterval(locationIntervalRef.current);
       }
       socket.disconnect();
     };
-  }, [user]);
+  }, [user, onReady]);
 
   const startLocationTracking = () => {
     if (navigator.geolocation) {

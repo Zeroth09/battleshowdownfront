@@ -60,6 +60,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   
   const socketManagerRef = useRef<any>(null);
+  const [socketManagerReady, setSocketManagerReady] = useState(false);
 
   useEffect(() => {
     // Ambil tim dari localStorage
@@ -152,12 +153,15 @@ export default function DashboardPage() {
     console.log('🎯 handleSubmitAnswer called with:', answer);
     console.log('🎯 activeBattle:', activeBattle);
     console.log('🎯 socketManagerRef.current:', socketManagerRef.current);
+    console.log('🎯 socketManagerReady:', socketManagerReady);
     
-    if (socketManagerRef.current?.submitAnswer) {
+    if (socketManagerRef.current?.submitAnswer && socketManagerReady) {
       console.log('🎯 Calling submitAnswer...');
       socketManagerRef.current.submitAnswer(activeBattle?.id || '', answer);
     } else {
-      console.error('❌ socketManagerRef.current.submitAnswer is not available');
+      console.error('❌ socketManagerRef.current.submitAnswer is not available or not ready');
+      console.error('❌ socketManagerRef.current:', socketManagerRef.current);
+      console.error('❌ socketManagerReady:', socketManagerReady);
     }
   };
 
@@ -372,6 +376,10 @@ export default function DashboardPage() {
           onBattleStart={handleBattleStart}
           onBattleEnd={handleBattleEnd}
           onNearbyPlayers={handleNearbyPlayers}
+          onReady={() => {
+            console.log('✅ SocketManager ready!');
+            setSocketManagerReady(true);
+          }}
         />
       )}
     </div>
