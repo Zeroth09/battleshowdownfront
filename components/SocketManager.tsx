@@ -126,6 +126,13 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
       onBattleEnd(data);
     });
 
+    // Debug: log all emitted events
+    const originalEmit = socket.emit;
+    socket.emit = function(event, ...args) {
+      console.log(`📤 Emitting event: ${event}`, args);
+      return originalEmit.apply(this, [event, ...args]);
+    };
+
     socket.on('pemain-keluar', (data) => {
       console.log('Pemain keluar:', data);
     });

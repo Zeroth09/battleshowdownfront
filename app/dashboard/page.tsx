@@ -194,8 +194,24 @@ export default function DashboardPage() {
           jawaban: answer,
           pemainId: user?.pemainId
         });
+        console.log('✅ Fallback event emitted successfully');
       } else {
         console.error('❌ No socket available for fallback');
+        
+        // Last resort: try to find socket in any way possible
+        console.log('🔄 Trying last resort method...');
+        const socket = (window as any).socket || socketManagerRef.current || socketManagerInstance;
+        if (socket && socket.emit) {
+          console.log('🎯 Using last resort socket');
+          socket.emit('jawab-battle', {
+            battleId: activeBattle?.id || '',
+            jawaban: answer,
+            pemainId: user?.pemainId
+          });
+          console.log('✅ Last resort event emitted successfully');
+        } else {
+          console.error('❌ No socket found anywhere');
+        }
       }
     }
   };
