@@ -19,10 +19,6 @@ const SocketManager = dynamic(() => import('../../components/SocketManager'), {
   ssr: false,
 });
 
-const ManualProximity = dynamic(() => import('../../components/ManualProximity'), {
-  ssr: false,
-});
-
 const BluetoothProximity = dynamic(() => import('../../components/BluetoothProximity'), {
   ssr: false,
 });
@@ -238,15 +234,6 @@ export default function DashboardPage() {
     }, 3000);
     
     console.log('✅ Battle error handled, state cleared');
-  };
-
-  const handleManualProximity = () => {
-    console.log('🎯 Manual proximity trigger activated!');
-    // Trigger battle manually
-    if (socketManagerInstance?.submitAnswer) {
-      // Simulate battle trigger
-      console.log('🎯 Simulating battle trigger...');
-    }
   };
 
   const handleBluetoothProximity = (distance: number) => {
