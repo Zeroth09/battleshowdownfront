@@ -61,6 +61,15 @@ export default function DashboardPage() {
   
   const socketManagerRef = useRef<any>(null);
   const [socketManagerReady, setSocketManagerReady] = useState(false);
+  const [socketManagerInstance, setSocketManagerInstance] = useState<any>(null);
+
+  // Effect untuk memastikan ref siap
+  useEffect(() => {
+    if (socketManagerRef.current && socketManagerReady) {
+      setSocketManagerInstance(socketManagerRef.current);
+      console.log('✅ SocketManager ref is ready:', socketManagerRef.current);
+    }
+  }, [socketManagerRef.current, socketManagerReady]);
 
   useEffect(() => {
     // Ambil tim dari localStorage
@@ -154,14 +163,38 @@ export default function DashboardPage() {
     console.log('🎯 activeBattle:', activeBattle);
     console.log('🎯 socketManagerRef.current:', socketManagerRef.current);
     console.log('🎯 socketManagerReady:', socketManagerReady);
+    console.log('🎯 socketManagerInstance:', socketManagerInstance);
     
-    if (socketManagerRef.current?.submitAnswer && socketManagerReady) {
+    // Try multiple ways to get submitAnswer function
+    let submitAnswerFunc = null;
+    
+    if (socketManagerRef.current?.submitAnswer) {
+      submitAnswerFunc = socketManagerRef.current.submitAnswer;
+      console.log('🎯 Found submitAnswer in ref.current');
+    } else if (socketManagerInstance?.submitAnswer) {
+      submitAnswerFunc = socketManagerInstance.submitAnswer;
+      console.log('🎯 Found submitAnswer in instance');
+    }
+    
+    if (submitAnswerFunc && socketManagerReady) {
       console.log('🎯 Calling submitAnswer...');
-      socketManagerRef.current.submitAnswer(activeBattle?.id || '', answer);
+      submitAnswerFunc(activeBattle?.id || '', answer);
     } else {
-      console.error('❌ socketManagerRef.current.submitAnswer is not available or not ready');
+      console.error('❌ submitAnswer function not available');
       console.error('❌ socketManagerRef.current:', socketManagerRef.current);
+      console.error('❌ socketManagerInstance:', socketManagerInstance);
       console.error('❌ socketManagerReady:', socketManagerReady);
+      
+      // Fallback: try to emit directly if we have socket
+      console.log('🔄 Trying fallback method...');
+      if (typeof window !== 'undefined' && (window as any).socket) {
+        console.log('🎯 Using window.socket fallback');
+        (window as any).socket.emit('jawab-battle', {
+          battleId: activeBattle?.id || '',
+          jawaban: answer,
+          pemainId: user?.pemainId
+        });
+      }
     }
   };
 
@@ -379,6 +412,11 @@ export default function DashboardPage() {
           onReady={() => {
             console.log('✅ SocketManager ready!');
             setSocketManagerReady(true);
+            // Also store the instance
+            if (socketManagerRef.current) {
+              setSocketManagerInstance(socketManagerRef.current);
+              console.log('✅ SocketManager instance stored');
+            }
           }}
         />
       )}

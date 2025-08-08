@@ -64,6 +64,11 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
     });
 
     socketRef.current = socket;
+    
+    // Expose socket to window for fallback
+    if (typeof window !== 'undefined') {
+      (window as any).socket = socket;
+    }
 
     // Event listeners
     socket.on('connect', () => {
