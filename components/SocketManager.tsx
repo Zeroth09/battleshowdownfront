@@ -134,6 +134,14 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
       }
     });
 
+    socket.on('battle-error', (data) => {
+      console.log('❌ Battle error:', data);
+      // Reset battle state di frontend
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('battle-error', { detail: data }));
+      }
+    });
+
     // Debug: log all emitted events
     const originalEmit = socket.emit;
     socket.emit = function(event, ...args) {

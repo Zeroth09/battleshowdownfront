@@ -78,10 +78,17 @@ export default function DashboardPage() {
       handleBattleCancelled(event.detail);
     };
 
+    const handleBattleErrorEvent = (event: CustomEvent) => {
+      console.log('❌ Received battle-error event:', event.detail);
+      handleBattleError(event.detail);
+    };
+
     window.addEventListener('battle-dibatalkan', handleBattleCancelledEvent as EventListener);
+    window.addEventListener('battle-error', handleBattleErrorEvent as EventListener);
     
     return () => {
       window.removeEventListener('battle-dibatalkan', handleBattleCancelledEvent as EventListener);
+      window.removeEventListener('battle-error', handleBattleErrorEvent as EventListener);
     };
   }, []);
 
@@ -200,6 +207,29 @@ export default function DashboardPage() {
     }, 3000);
     
     console.log('✅ Battle cancelled, state cleared');
+  };
+
+  const handleBattleError = (data: any) => {
+    console.log('❌ handleBattleError called with:', data);
+    
+    // Clear active battle
+    setActiveBattle(null);
+    
+    // Clear localStorage
+    localStorage.removeItem('currentBattle');
+    
+    // Show error message
+    setBattleResult({
+      menang: false,
+      pesan: '❌ BATTLE ERROR - Battle tidak ditemukan'
+    });
+    
+    // Auto-hide result after 3 seconds
+    setTimeout(() => {
+      setBattleResult(null);
+    }, 3000);
+    
+    console.log('✅ Battle error handled, state cleared');
   };
 
   const handleNearbyPlayers = (players: any[]) => {

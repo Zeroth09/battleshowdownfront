@@ -238,6 +238,14 @@ io.on('connection', (socket) => {
     if (!battle || battle.selesai) {
       console.log('❌ Battle not found or already finished');
       console.log('❌ Available battle IDs:', Array.from(pertempuranAktif.keys()));
+      
+      // Notify frontend bahwa battle tidak ditemukan
+      socket.emit('battle-error', {
+        message: 'Battle tidak ditemukan atau sudah selesai',
+        battleId,
+        availableBattles: Array.from(pertempuranAktif.keys())
+      });
+      
       return;
     }
 
@@ -369,9 +377,15 @@ io.on('connection', (socket) => {
         }
       });
       
-      battlesToRemove.forEach(battleId => {
-        pertempuranAktif.delete(battleId);
-      });
+      // Delay removal untuk memberi waktu frontend handle disconnect
+      setTimeout(() => {
+        battlesToRemove.forEach(battleId => {
+          if (pertempuranAktif.has(battleId)) {
+            console.log(`🗑️ Actually removing battle ${battleId} after delay`);
+            pertempuranAktif.delete(battleId);
+          }
+        });
+      }, 5000); // 5 detik delay
       
       // Remove dari Google Sheets
       try {
