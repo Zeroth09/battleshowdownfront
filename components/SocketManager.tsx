@@ -57,7 +57,7 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
 
   useEffect(() => {
     // Connect ke Socket.IO server
-    const socket = io(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000', {
+    const socket = io('https://battleshowdownback-production-df38.up.railway.app', {
       transports: ['websocket', 'polling']
     });
 
