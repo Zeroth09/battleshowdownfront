@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sword, Users, Target, Zap, ArrowRight, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Sword, Users, Target, Zap, Clock, Crown } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const SocketManager = dynamic(() => import('../../components/SocketManager'), {
@@ -50,8 +50,8 @@ export default function EventPage() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nearbyPlayers, setNearbyPlayers] = useState<any[]>([]);
-  const [battleStatus, setBattleStatus] = useState<string>('Siap Bertempur');
-  const [isTriggering, setIsTriggering] = useState(false);
+  const [battleStatus, setBattleStatus] = useState<string>('Menunggu Game Master');
+  const [isGameMaster, setIsGameMaster] = useState(false);
 
   const socketManagerRef = useRef<any>(null);
 
@@ -63,6 +63,13 @@ export default function EventPage() {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
         console.log('👤 User loaded:', parsedUser);
+        
+        // Check if user is game master (you can set this in localStorage)
+        const gameMasterId = localStorage.getItem('gameMasterId');
+        if (gameMasterId === parsedUser.pemainId) {
+          setIsGameMaster(true);
+          setBattleStatus('Game Master Mode');
+        }
       } catch (error) {
         console.error('❌ Error parsing user data:', error);
         setError('Error loading user data');
@@ -99,7 +106,7 @@ export default function EventPage() {
     
     setBattleResult(battleResultData);
     setActiveBattle(null);
-    setBattleStatus('Siap Bertempur');
+    setBattleStatus('Menunggu Game Master');
     setSelectedAnswer(null);
     setIsSubmitting(false);
     
@@ -154,7 +161,7 @@ export default function EventPage() {
     localStorage.removeItem('currentBattle');
     
     setTimeout(() => {
-      setBattleStatus('Siap Bertempur');
+      setBattleStatus('Menunggu Game Master');
     }, 3000);
   };
 
@@ -165,14 +172,13 @@ export default function EventPage() {
     localStorage.removeItem('currentBattle');
     
     setTimeout(() => {
-      setBattleStatus('Siap Bertempur');
+      setBattleStatus('Menunggu Game Master');
     }, 3000);
   };
 
   const triggerManualBattle = async () => {
-    if (isTriggering || !user) return;
+    if (!user || !isGameMaster) return;
     
-    setIsTriggering(true);
     setBattleStatus('Mencari Lawan...');
     
     try {
@@ -195,14 +201,12 @@ export default function EventPage() {
         };
         
         handleBattleStart(mockBattle);
-        setIsTriggering(false);
       }, 2000);
       
     } catch (error) {
       console.error('❌ Error triggering manual battle:', error);
       setError('Error triggering battle');
-      setIsTriggering(false);
-      setBattleStatus('Siap Bertempur');
+      setBattleStatus('Menunggu Game Master');
     }
   };
 
@@ -278,6 +282,18 @@ export default function EventPage() {
             <div className="text-right">
               <p className="text-sm text-gray-300">Player</p>
               <p className="font-bold">{user.nama}</p>
+              {isGameMaster && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Crown className="w-4 h-4 text-yellow-400" />
+                  <span className="text-xs text-yellow-400">Game Master</span>
+                </div>
+              )}
+              <a
+                href="/admin"
+                className="block mt-2 text-xs text-blue-300 hover:text-blue-200 transition-colors"
+              >
+                ⚙️ Admin Panel
+              </a>
             </div>
           </div>
         </div>
@@ -301,43 +317,55 @@ export default function EventPage() {
           </div>
         </div>
 
-        {/* Manual Battle Trigger */}
-        {!activeBattle && (
+        {/* Game Master Controls */}
+        {isGameMaster && !activeBattle && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-white/20"
           >
             <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Sword className="w-10 h-10 text-white" />
+              <div className="w-20 h-20 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Crown className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Manual Battle Trigger</h3>
+              <h3 className="text-xl font-bold mb-2">Game Master Controls</h3>
               <p className="text-gray-300 mb-6">
-                Klik tombol di bawah untuk memulai pertempuran manual
+                Klik tombol di bawah untuk memulai pertempuran
               </p>
               
               <button
                 onClick={triggerManualBattle}
-                disabled={isTriggering}
-                className={`w-full py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 transform ${
-                  isTriggering
-                    ? 'bg-gray-600 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-red-600 to-blue-600 hover:from-red-700 hover:to-blue-700 hover:scale-105 active:scale-95'
-                }`}
+                className="w-full py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 transform bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 hover:scale-105 active:scale-95"
               >
-                {isTriggering ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    <span>Mencari Lawan...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-2">
-                    <Target className="w-5 h-5" />
-                    <span>⚔️ TRIGGER BATTLE MANUAL</span>
-                  </div>
-                )}
+                <div className="flex items-center justify-center gap-2">
+                  <Sword className="w-5 h-5" />
+                  <span>⚔️ TRIGGER BATTLE</span>
+                </div>
               </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Participant Waiting */}
+        {!isGameMaster && !activeBattle && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-white/20"
+          >
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Menunggu Game Master</h3>
+              <p className="text-gray-300 mb-6">
+                Game Master akan memulai pertempuran. Bersiaplah!
+              </p>
+              
+              <div className="flex items-center justify-center gap-2 text-blue-300">
+                <div className="animate-pulse">⏳</div>
+                <span>Menunggu...</span>
+              </div>
             </div>
           </motion.div>
         )}
@@ -393,23 +421,25 @@ export default function EventPage() {
                   ))}
                 </div>
 
-                {/* Manual End Buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleManualBattleEnd(true)}
-                    disabled={isSubmitting}
-                    className="flex-1 bg-green-600 hover:bg-green-700 py-2 px-4 rounded-lg font-bold transition-all"
-                  >
-                    🏆 Menang
-                  </button>
-                  <button
-                    onClick={() => handleManualBattleEnd(false)}
-                    disabled={isSubmitting}
-                    className="flex-1 bg-red-600 hover:bg-red-700 py-2 px-4 rounded-lg font-bold transition-all"
-                  >
-                    💔 Kalah
-                  </button>
-                </div>
+                {/* Game Master End Buttons */}
+                {isGameMaster && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleManualBattleEnd(true)}
+                      disabled={isSubmitting}
+                      className="flex-1 bg-green-600 hover:bg-green-700 py-2 px-4 rounded-lg font-bold transition-all"
+                    >
+                      🏆 Menang
+                    </button>
+                    <button
+                      onClick={() => handleManualBattleEnd(false)}
+                      disabled={isSubmitting}
+                      className="flex-1 bg-red-600 hover:bg-red-700 py-2 px-4 rounded-lg font-bold transition-all"
+                    >
+                      💔 Kalah
+                    </button>
+                  </div>
+                )}
               </motion.div>
             </motion.div>
           )}
