@@ -194,6 +194,8 @@ export default function DashboardPage() {
           jawaban: answer,
           pemainId: user?.pemainId
         });
+      } else {
+        console.error('❌ No socket available for fallback');
       }
     }
   };
