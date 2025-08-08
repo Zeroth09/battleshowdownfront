@@ -176,7 +176,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Map Section */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div className={`bg-white rounded-lg shadow-lg overflow-hidden ${activeBattle ? 'blur-sm' : ''}`}>
               <div className="p-4 bg-gray-50 border-b">
                 <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                   <MapPin className="w-5 h-5" />
@@ -188,7 +188,7 @@ export default function DashboardPage() {
               </div>
               
               {location && (
-                <div className="h-96">
+                <div className={`h-96 ${activeBattle ? 'pointer-events-none' : 'pointer-events-auto'}`}>
                   <MapComponent
                     userLocation={location}
                     userTeam={user?.tim || 'merah'}
@@ -254,7 +254,7 @@ export default function DashboardPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] pointer-events-auto"
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
