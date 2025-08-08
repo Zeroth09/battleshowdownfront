@@ -123,6 +123,9 @@ io.on('connection', (socket) => {
   socket.onAny((eventName, ...args) => {
     console.log(`📡 Socket ${socket.id} event: ${eventName}`, args);
   });
+  
+  // Debug: log connection details
+  console.log(`🔗 Socket ${socket.id} connected with events:`, socket.eventNames());
 
   // Pemain bergabung dengan tim
   socket.on('bergabung-tim', async (data) => {
@@ -192,6 +195,8 @@ io.on('connection', (socket) => {
     console.log('📝 Received jawab-battle event:', data);
     console.log('📝 Socket ID:', socket.id);
     console.log('📝 All active battles:', Array.from(pertempuranAktif.keys()));
+    console.log('📝 Total connected sockets:', io.engine.clientsCount);
+    console.log('📝 All socket IDs:', Array.from(io.sockets.sockets.keys()));
     
     const { battleId, jawaban, pemainId } = data;
     const battle = pertempuranAktif.get(battleId);
