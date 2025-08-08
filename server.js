@@ -149,8 +149,11 @@ io.on('connection', (socket) => {
       await googleSheetsService.updatePlayerLocation(socket.id, playerData);
       console.log(`📊 Added ${nama} to Google Sheets`);
     } catch (error) {
-      console.error(`❌ Error adding ${nama} to Google Sheets:`, error.message);
+      console.error('❌ Error adding player to Google Sheets:', error);
     }
+    
+    console.log(`📊 Total pemain aktif setelah bergabung: ${pemainAktif.size}`);
+    console.log(`📊 Active players:`, Array.from(pemainAktif.values()).map(p => `${p.nama} (${p.tim})`));
     
     socket.join(tim); // Join room berdasarkan tim
     socket.emit('bergabung-berhasil', { tim, pemainId });
@@ -320,13 +323,21 @@ io.on('connection', (socket) => {
   socket.on('disconnect', async () => {
     const pemain = pemainAktif.get(socket.id);
     if (pemain) {
+      console.log(`🔴 Pemain terputus: ${socket.id} (${pemain.nama})`);
       socket.to(pemain.tim).emit('pemain-keluar', { nama: pemain.nama });
       pemainAktif.delete(socket.id);
       
       // Remove dari Google Sheets
-      await googleSheetsService.removePlayer(socket.id);
+      try {
+        await googleSheetsService.removePlayer(socket.id);
+      } catch (error) {
+        console.error('❌ Error removing player from Google Sheets:', error);
+      }
+      
+      console.log(`📊 Total pemain aktif setelah disconnect: ${pemainAktif.size}`);
+    } else {
+      console.log(`🔴 Socket terputus tanpa data pemain: ${socket.id}`);
     }
-    console.log('Pemain terputus:', socket.id);
   });
 });
 
@@ -370,15 +381,6 @@ function cekJarakPemain(socketId, pemain) {
         battleLocks.delete(lockKey);
       }, 5000);
       
-      // Cleanup battle yang timeout setelah 30 detik
-      setTimeout(() => {
-        if (pertempuranAktif.has(battleId)) {
-          console.log(`⏰ Battle ${battleId} timeout, clearing...`);
-          pertempuranAktif.delete(battleId);
-          console.log(`📊 Total battles after timeout cleanup: ${pertempuranAktif.size}`);
-        }
-      }, 30000);
-        
         triggerBattle(socketId, idLawan, pemain, dataLawan);
       } else {
         console.log(`⏸️ Battle sudah aktif atau locked untuk ${pemain.nama}, skip trigger`);
