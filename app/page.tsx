@@ -1,392 +1,158 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { 
-  Sword, 
-  Users, 
-  MapPin, 
-  Zap, 
-  Trophy, 
-  Shield,
-  ArrowRight,
-  Play,
-  Star
-} from 'lucide-react';
+import { Users, Crown, Eye, ArrowRight } from 'lucide-react';
 
-export default function HomePage() {
-  const [selectedTeam, setSelectedTeam] = useState('');
-  const [showTeamSelection, setShowTeamSelection] = useState(false);
-
-  const handleStartGame = () => {
-    if (!selectedTeam) {
-      setShowTeamSelection(true);
-      return;
-    }
-    
-    // Simpan tim ke localStorage
-    localStorage.setItem('selectedTeam', selectedTeam);
-    window.location.href = '/dashboard';
-  };
-
+const HomePage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-red-900 to-gray-900">
-      {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        {/* Background Image */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
-          style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1511512578047-dfb367046420?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2071&q=80')"
-          }}
-        />
-        
-        {/* Content */}
-        <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 font-display">
-              <span className="text-red-400">Battle</span> Showdown
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Pertempuran real-time dengan sistem deteksi pemain yang akurat. 
-              Bertemu lawan dalam jarak 1-2 meter? Battle otomatis dimulai!
-            </p>
-            
-            {/* Team Selection */}
-            {showTeamSelection && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="mb-8"
-              >
-                <h3 className="text-3xl font-bold text-white mb-6">Pilih Tim Kamu</h3>
-                <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedTeam('merah')}
-                    className={`p-8 rounded-xl border-4 transition-all ${
-                      selectedTeam === 'merah' 
-                        ? 'border-red-500 bg-red-500/20 shadow-lg shadow-red-500/50' 
-                        : 'border-red-300 bg-red-500/10 hover:bg-red-500/20'
-                    }`}
-                  >
-                    <div className="text-white">
-                      <div className="text-4xl mb-2">🔥</div>
-                      <div className="text-2xl font-bold mb-2">Tim Merah</div>
-                      <div className="text-sm opacity-80">Pasukan Api</div>
-                    </div>
-                  </motion.button>
-                  
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSelectedTeam('putih')}
-                    className={`p-8 rounded-xl border-4 transition-all ${
-                      selectedTeam === 'putih' 
-                        ? 'border-white bg-white/20 shadow-lg shadow-white/50' 
-                        : 'border-gray-300 bg-white/10 hover:bg-white/20'
-                    }`}
-                  >
-                    <div className="text-white">
-                      <div className="text-4xl mb-2">❄️</div>
-                      <div className="text-2xl font-bold mb-2">Tim Putih</div>
-                      <div className="text-sm opacity-80">Pasukan Es</div>
-                    </div>
-                  </motion.button>
-                </div>
-              </motion.div>
-            )}
-            
-            <div className="flex justify-center items-center">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleStartGame}
-                className="btn-primary text-lg px-8 py-4 flex items-center gap-2"
-              >
-                <Play className="w-5 h-5" />
-                {selectedTeam ? `Mulai sebagai ${selectedTeam === 'merah' ? 'Tim Merah' : 'Tim Putih'}` : 'Mulai'}
-              </motion.button>
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+      {/* Header */}
+      <div className="bg-black/20 backdrop-blur-sm border-b border-white/10">
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-white mb-2">Lomba Battle Showdown</h1>
+            <p className="text-gray-300">Sistem pertempuran real-time dengan spectator live view</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-6xl mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          
+          {/* Peserta */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:bg-white/15 transition-all duration-300">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Peserta</h2>
+              <p className="text-gray-300">Bergabung dalam pertempuran</p>
             </div>
-          </motion.div>
-        </div>
-        
-        {/* Floating Elements */}
-        <motion.div
-          animate={{ y: [-10, 10, -10] }}
-          transition={{ duration: 3, repeat: Infinity }}
-          className="absolute top-20 left-10 text-red-400 opacity-30"
-        >
-          <Sword className="w-12 h-12" />
-        </motion.div>
-        
-        <motion.div
-          animate={{ y: [10, -10, 10] }}
-          transition={{ duration: 4, repeat: Infinity }}
-          className="absolute top-40 right-20 text-white opacity-30"
-        >
-          <Shield className="w-10 h-10" />
-        </motion.div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-20 px-4 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 font-display">
-              Fitur <span className="text-red-600">Menarik</span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Nikmati pengalaman gaming yang seru dengan fitur-fitur canggih kami
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.1 }}
-              viewport={{ once: true }}
-              className="card-hover text-center p-8"
-            >
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <MapPin className="w-8 h-8 text-red-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Deteksi Lokasi Akurat
-              </h3>
-              <p className="text-gray-600">
-                Sistem GPS canggih dengan akurasi 1-2 meter untuk mendeteksi pemain lawan
-              </p>
-            </motion.div>
-
-            {/* Feature 2 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              viewport={{ once: true }}
-              className="card-hover text-center p-8"
-            >
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Zap className="w-8 h-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Battle Otomatis
-              </h3>
-              <p className="text-gray-600">
-                Pertempuran otomatis dengan pertanyaan seru ketika bertemu lawan
-              </p>
-            </motion.div>
-
-            {/* Feature 3 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              viewport={{ once: true }}
-              className="card-hover text-center p-8"
-            >
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Users className="w-8 h-8 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Tim Merah vs Putih
-              </h3>
-              <p className="text-gray-600">
-                Bergabung dengan tim favorit dan bertempur melawan tim lawan
-              </p>
-            </motion.div>
-
-            {/* Feature 4 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
-              viewport={{ once: true }}
-              className="card-hover text-center p-8"
-            >
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Trophy className="w-8 h-8 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Sistem Skor
-              </h3>
-              <p className="text-gray-600">
-                Raih skor tinggi dan naik ke leaderboard teratas
-              </p>
-            </motion.div>
-
-            {/* Feature 5 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.5 }}
-              viewport={{ once: true }}
-              className="card-hover text-center p-8"
-            >
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Star className="w-8 h-8 text-yellow-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Pertanyaan Seru
-              </h3>
-              <p className="text-gray-600">
-                Ribuan pertanyaan dari berbagai kategori yang menantang
-              </p>
-            </motion.div>
-
-            {/* Feature 6 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.6 }}
-              viewport={{ once: true }}
-              className="card-hover text-center p-8"
-            >
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Shield className="w-8 h-8 text-indigo-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Keamanan Terjamin
-              </h3>
-              <p className="text-gray-600">
-                Sistem autentikasi yang aman dan data terlindungi
-              </p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* How to Play Section */}
-      <section className="py-20 px-4 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 font-display">
-              Cara <span className="text-red-600">Bermain</span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Ikuti langkah-langkah sederhana untuk mulai bertempur
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Step 1 */}
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.1 }}
-              viewport={{ once: true }}
-              className="text-center"
-            >
-              <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                1
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Pilih Tim
-              </h3>
-              <p className="text-gray-600">
-                Pilih tim merah atau putih sesuai preferensi
-              </p>
-            </motion.div>
-
-            {/* Step 2 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              viewport={{ once: true }}
-              className="text-center"
-            >
-              <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                2
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Jelajahi & Cari Lawan
-              </h3>
-              <p className="text-gray-600">
-                Bergerak di area permainan dan cari pemain dari tim lawan
-              </p>
-            </motion.div>
-
-            {/* Step 3 */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              viewport={{ once: true }}
-              className="text-center"
-            >
-              <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-6 text-white text-2xl font-bold">
-                3
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                Battle Otomatis
-              </h3>
-              <p className="text-gray-600">
-                Ketika bertemu lawan dalam jarak 1-2 meter, battle otomatis dimulai
-              </p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-red-600 to-red-800">
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 font-display">
-              Siap untuk <span className="text-yellow-300">Bertempur</span>?
-            </h2>
-            <p className="text-xl text-red-100 mb-8 max-w-2xl mx-auto">
-              Bergabunglah dengan ribuan pemain lainnya dan buktikan keahlianmu dalam pertempuran real-time!
-            </p>
             
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleStartGame}
-              className="bg-white text-red-600 font-bold py-4 px-8 rounded-lg text-lg hover:bg-gray-100 transition-all duration-200 flex items-center gap-2 mx-auto"
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Join waiting room</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Jawab pertanyaan</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Lihat hasil otomatis</span>
+              </div>
+            </div>
+            
+            <Link 
+              href="/lomba"
+              className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center space-x-2 transition-all duration-200"
             >
-              <Play className="w-5 h-5" />
-              {selectedTeam ? `Mulai sebagai ${selectedTeam === 'merah' ? 'Tim Merah' : 'Tim Putih'}` : 'Mulai'}
-            </motion.button>
-          </motion.div>
-        </div>
-      </section>
+              <span>Mulai Sebagai Peserta</span>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
 
-      {/* Footer */}
-      <footer className="py-12 px-4 bg-gray-900 text-white">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-gray-400">
-            © 2024 Battle Showdown Games. Dibuat dengan ❤️ untuk gamers Indonesia.
-          </p>
+          {/* Game Master */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:bg-white/15 transition-all duration-300">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Crown className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Game Master</h2>
+              <p className="text-gray-300">Kontrol pertempuran</p>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Lihat daftar peserta</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Trigger pertanyaan</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Monitor real-time</span>
+              </div>
+            </div>
+            
+            <Link 
+              href="/game-master"
+              className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center space-x-2 transition-all duration-200"
+            >
+              <span>Mulai Sebagai Game Master</span>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
+
+          {/* Spectator */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:bg-white/15 transition-all duration-300">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Eye className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Spectator</h2>
+              <p className="text-gray-300">Lihat live view</p>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Lihat pertanyaan</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Jawaban real-time</span>
+              </div>
+              <div className="flex items-center space-x-3 text-sm text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Hasil live</span>
+              </div>
+            </div>
+            
+            <Link 
+              href="/spectator"
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center space-x-2 transition-all duration-200"
+            >
+              <span>Mulai Sebagai Spectator</span>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+          </div>
         </div>
-      </footer>
+
+        {/* Info Section */}
+        <div className="mt-12 bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+          <h3 className="text-xl font-bold text-white mb-4 text-center">Cara Menggunakan</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <h4 className="font-semibold text-white mb-3">Untuk Event Organizer:</h4>
+              <ol className="space-y-2 text-sm text-gray-300">
+                <li>1. Buka halaman <strong className="text-white">Game Master</strong></li>
+                <li>2. Tunggu peserta bergabung di lobby</li>
+                <li>3. Klik "TRIGGER PERTANYAAN" untuk memulai</li>
+                <li>4. Monitor jawaban real-time</li>
+              </ol>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-white mb-3">Untuk Peserta:</h4>
+              <ol className="space-y-2 text-sm text-gray-300">
+                <li>1. Buka halaman <strong className="text-white">Peserta</strong></li>
+                <li>2. Tunggu pertanyaan dari Game Master</li>
+                <li>3. Jawab dengan cepat dan benar</li>
+                <li>4. Lihat hasil otomatis</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
-} 
+};
+
+export default HomePage; 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useImperativeHandle } from 'react';
+import React, { forwardRef, useImperativeHandle, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 interface User {
@@ -29,217 +29,218 @@ interface Battle {
   };
 }
 
-interface BattleResult {
-  menang: boolean;
-  pesan: string;
+interface LiveAnswer {
+  pemainId: string;
+  nama: string;
+  tim: 'merah' | 'putih';
+  jawaban: string;
+  waktu: Date;
 }
 
 interface SocketManagerProps {
   user: User;
-  initialLocation?: {
-    latitude: number;
-    longitude: number;
-  };
-  onBattleStart: (data: Battle) => void;
-  onBattleEnd: (result: BattleResult) => void;
-  onNearbyPlayers: (players: any[]) => void;
   onReady?: () => void;
+  onBattleStart?: (battleData: Battle) => void;
+  onBattleEnd?: (result: any) => void;
+  onLiveAnswer?: (answerData: LiveAnswer) => void;
 }
 
-const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer: string) => void }, SocketManagerProps>(({
-  user,
-  initialLocation,
-  onBattleStart,
-  onBattleEnd,
-  onNearbyPlayers,
-  onReady
-}, ref) => {
-  const socketRef = useRef<Socket | null>(null);
-  const locationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+export interface SocketManagerRef {
+  socket: Socket | null;
+  submitAnswer: (battleId: string, answer: string) => Promise<void>;
+  joinLobby: () => void;
+  leaveLobby: () => void;
+  joinSpectator: () => void;
+}
 
-  useEffect(() => {
-    // Connect ke Socket.IO server
-    const socket = io('https://battleshowdownback-production-df38.up.railway.app', {
-      transports: ['websocket', 'polling']
-    });
+const SocketManager = forwardRef<SocketManagerRef, SocketManagerProps>(
+  ({ user, onReady, onBattleStart, onBattleEnd, onLiveAnswer }, ref) => {
+    const [socket, setSocket] = useState<Socket | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
 
-    socketRef.current = socket;
-    
-    // Expose socket to window for fallback
-    if (typeof window !== 'undefined') {
-      (window as any).socket = socket;
-    }
-
-    // Event listeners
-    socket.on('connect', () => {
-      console.log('🟢 Connected to server:', socket.id);
+    // Initialize socket connection
+    useEffect(() => {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://battleshowdownback-production-df38.up.railway.app';
       
-      // Bergabung dengan tim
-      if (initialLocation) {
-        socket.emit('bergabung-tim', {
+      const newSocket = io(backendUrl, {
+        transports: ['websocket', 'polling'],
+        timeout: 20000,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+      });
+
+      setSocket(newSocket);
+
+      // Connection events
+      newSocket.on('connect', () => {
+        console.log('🔌 Connected to server');
+        setIsConnected(true);
+        
+        // Send user data to server
+        newSocket.emit('join-lobby', {
           pemainId: user.pemainId,
           nama: user.nama,
           tim: user.tim,
-          lokasi: initialLocation
+          lokasi: user.lokasi
         });
-      } else if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            socket.emit('bergabung-tim', {
-              pemainId: user.pemainId,
-              nama: user.nama,
-              tim: user.tim,
-              lokasi: { latitude, longitude }
-            });
-          },
-          (error) => {
-            console.error('Error getting location:', error);
-            // Default location (Jakarta)
-            socket.emit('bergabung-tim', {
-              pemainId: user.pemainId,
-              nama: user.nama,
-              tim: user.tim,
-              lokasi: { latitude: -6.2088, longitude: 106.8456 }
-            });
-          }
-        );
-      }
-    });
-
-    socket.on('bergabung-berhasil', (data) => {
-      console.log('✅ Berhasil bergabung dengan tim:', data);
-    });
-
-    socket.on('pemain-baru', (data) => {
-      console.log('👤 Pemain baru bergabung:', data);
-    });
-
-    socket.on('battle-dimulai', (data) => {
-      console.log('⚔️ Battle dimulai:', data);
-      onBattleStart(data);
-    });
-
-    socket.on('battle-selesai', (data) => {
-      console.log('🏁 Battle selesai:', data);
-      console.log('📊 Battle result data:', JSON.stringify(data, null, 2));
-      onBattleEnd(data);
-    });
-
-    socket.on('battle-dibatalkan', (data) => {
-      console.log('❌ Battle dibatalkan:', data);
-      // Reset battle state di frontend
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('battle-dibatalkan', { detail: data }));
-      }
-    });
-
-    socket.on('battle-error', (data) => {
-      console.log('❌ Battle error:', data);
-      // Reset battle state di frontend
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('battle-error', { detail: data }));
-      }
-    });
-
-    // Listen for global battle events (Game Master)
-    socket.on('global-battle-start', (data) => {
-      console.log('👑 Global battle started:', data);
-      onBattleStart(data.battleData);
-    });
-
-    socket.on('global-battle-end', (data) => {
-      console.log('👑 Global battle ended:', data);
-      onBattleEnd(data.result);
-    });
-
-    // Debug: log all emitted events
-    const originalEmit = socket.emit;
-    socket.emit = function(event, ...args) {
-      console.log(`📤 Emitting event: ${event}`, args);
-      return originalEmit.apply(this, [event, ...args]);
-    };
-
-    socket.on('pemain-keluar', (data) => {
-      console.log('Pemain keluar:', data);
-    });
-
-    socket.on('disconnect', () => {
-      console.log('Disconnected from server');
-    });
-
-    // Start location tracking
-    startLocationTracking();
-
-    // Call onReady when component is ready
-    if (onReady) {
-      setTimeout(() => {
-        console.log('🎯 SocketManager calling onReady...');
-        onReady();
-      }, 2000); // Give more time for socket to connect
-    }
-
-    return () => {
-      if (locationIntervalRef.current) {
-        clearInterval(locationIntervalRef.current);
-      }
-      socket.disconnect();
-    };
-  }, [user, onReady]);
-
-  const startLocationTracking = () => {
-    if (navigator.geolocation) {
-      console.log('📍 Starting location tracking...');
-      // Update lokasi setiap 5 detik
-      locationIntervalRef.current = setInterval(() => {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            console.log(`📍 Location update: ${latitude}, ${longitude}`);
-            if (socketRef.current) {
-              socketRef.current.emit('update-lokasi', { latitude, longitude });
-            }
-          },
-          (error) => {
-            console.error('❌ Error updating location:', error);
-          }
-        );
-      }, 5000);
-    }
-  };
-
-  const submitAnswer = (battleId: string, answer: string) => {
-    console.log(`📝 submitAnswer called with battleId: ${battleId}, answer: ${answer}`);
-    console.log(`📝 socketRef.current:`, socketRef.current);
-    console.log(`📝 user.pemainId:`, user.pemainId);
-    
-    if (socketRef.current) {
-      console.log(`📝 Emitting jawab-battle event...`);
-      socketRef.current.emit('jawab-battle', {
-        battleId,
-        jawaban: answer,
-        pemainId: user.pemainId
       });
-      console.log(`📝 Event emitted successfully`);
-    } else {
-      console.error(`❌ socketRef.current is null`);
-    }
-  };
 
-  // Expose socket directly for fallback
-  useEffect(() => {
-    if (socketRef.current && typeof window !== 'undefined') {
-      (window as any).socket = socketRef.current;
-      console.log('✅ Socket exposed to window for fallback');
-    }
-  }, [socketRef.current]);
+      newSocket.on('disconnect', () => {
+        console.log('🔌 Disconnected from server');
+        setIsConnected(false);
+      });
 
-  // Expose submitAnswer function untuk digunakan di parent component
-  useImperativeHandle(ref, () => ({
-    submitAnswer
-  }));
+      newSocket.on('connect_error', (error) => {
+        console.error('❌ Connection error:', error);
+        setIsConnected(false);
+      });
 
-  return null; // Component ini tidak render apapun
-});
+      // Battle events
+      newSocket.on('battle-start', (battleData: Battle) => {
+        console.log('⚔️ Battle started:', battleData);
+        onBattleStart?.(battleData);
+      });
+
+      newSocket.on('battle-selesai', (result: any) => {
+        console.log('🏁 Battle finished:', result);
+        onBattleEnd?.(result);
+      });
+
+      // Battle cancellation events
+      newSocket.on('battle-dibatalkan', (data: any) => {
+        console.log('❌ Battle cancelled:', data);
+        window.dispatchEvent(new CustomEvent('battle-dibatalkan', { detail: data }));
+      });
+
+      newSocket.on('battle-error', (data: any) => {
+        console.log('❌ Battle error:', data);
+        window.dispatchEvent(new CustomEvent('battle-error', { detail: data }));
+      });
+
+      // Global battle events (Game Master)
+      newSocket.on('global-battle-start', (data: any) => {
+        console.log('👑 Global battle started:', data);
+        onBattleStart?.(data.battleData);
+      });
+
+      newSocket.on('global-battle-end', (data: any) => {
+        console.log('👑 Global battle ended:', data);
+        onBattleEnd?.(data.result);
+      });
+
+      // Live answer events (Spectator)
+      newSocket.on('live-answer', (answerData: LiveAnswer) => {
+        console.log('👁️ Live answer received:', answerData);
+        onLiveAnswer?.(answerData);
+      });
+
+      // Lobby events
+      newSocket.on('lobby-update', (data: any) => {
+        console.log('👥 Lobby updated:', data);
+      });
+
+      // Spectator events
+      newSocket.on('spectator-update', (data: any) => {
+        console.log('👁️ Spectator update:', data);
+      });
+
+      // Call onReady after connection is established
+      setTimeout(() => {
+        if (onReady) {
+          onReady();
+        }
+      }, 2000);
+
+      return () => {
+        newSocket.close();
+      };
+    }, [user, onReady, onBattleStart, onBattleEnd, onLiveAnswer]);
+
+    // Expose methods via ref
+    useImperativeHandle(ref, () => ({
+      socket,
+      submitAnswer: async (battleId: string, answer: string) => {
+        if (!socket) {
+          throw new Error('Socket not connected');
+        }
+        
+        return new Promise((resolve, reject) => {
+          socket.emit('jawab-battle', {
+            battleId,
+            jawaban: answer,
+            pemainId: user.pemainId,
+            nama: user.nama,
+            tim: user.tim
+          }, (response: any) => {
+            if (response.success) {
+              console.log('✅ Answer submitted successfully');
+              resolve();
+            } else {
+              console.error('❌ Failed to submit answer:', response.error);
+              reject(new Error(response.error));
+            }
+          });
+        });
+      },
+      joinLobby: () => {
+        if (socket) {
+          socket.emit('join-lobby', {
+            pemainId: user.pemainId,
+            nama: user.nama,
+            tim: user.tim,
+            lokasi: user.lokasi
+          });
+        }
+      },
+      leaveLobby: () => {
+        if (socket) {
+          socket.emit('leave-lobby', {
+            pemainId: user.pemainId
+          });
+        }
+      },
+      joinSpectator: () => {
+        if (socket) {
+          socket.emit('join-spectator', {
+            spectatorId: user.pemainId,
+            nama: user.nama
+          });
+        }
+      }
+    }), [socket, user]);
+
+    // Expose socket globally for fallback
+    useEffect(() => {
+      if (socket) {
+        (window as any).socket = {
+          submitAnswer: async (battleId: string, answer: string) => {
+            if (!socket) throw new Error('Socket not connected');
+            
+            return new Promise((resolve, reject) => {
+              socket.emit('jawab-battle', {
+                battleId,
+                jawaban: answer,
+                pemainId: user.pemainId,
+                nama: user.nama,
+                tim: user.tim
+              }, (response: any) => {
+                if (response.success) {
+                  resolve();
+                } else {
+                  reject(new Error(response.error));
+                }
+              });
+            });
+          }
+        };
+      }
+    }, [socket, user]);
+
+    return null; // This component doesn't render anything
+  }
+);
+
+SocketManager.displayName = 'SocketManager';
 
 export default SocketManager; 
