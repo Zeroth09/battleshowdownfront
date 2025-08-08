@@ -23,6 +23,10 @@ const BluetoothProximity = dynamic(() => import('../../components/BluetoothProxi
   ssr: false,
 });
 
+const BluetoothModal = dynamic(() => import('../../components/BluetoothModal'), {
+  ssr: false,
+});
+
 interface User {
   pemainId: string;
   nama: string;
@@ -63,6 +67,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [teamSelected, setTeamSelected] = useState(false);
+  const [showBluetoothModal, setShowBluetoothModal] = useState(false);
   
   const socketManagerRef = useRef<any>(null);
   const [socketManagerReady, setSocketManagerReady] = useState(false);
@@ -257,18 +262,33 @@ export default function DashboardPage() {
     console.log('📱 Bluetooth status:', status);
   };
 
-  // Auto-trigger Bluetooth scanning after team selection
+  const handleBluetoothModalClose = () => {
+    setShowBluetoothModal(false);
+  };
+
+  const handleBluetoothModalStart = () => {
+    console.log('🎯 Starting Bluetooth scan from modal...');
+    // Trigger Bluetooth scanning via window event
+    window.dispatchEvent(new CustomEvent('start-bluetooth-scan'));
+    setShowBluetoothModal(false);
+  };
+
+  const handleBluetoothModalError = (error: string) => {
+    console.error('❌ Bluetooth modal error:', error);
+    setError(error);
+  };
+
+  // Show Bluetooth modal after team selection
   useEffect(() => {
-    if (teamSelected && socketManagerReady && user) {
-      console.log('🎯 Team selected, auto-triggering Bluetooth scan...');
+    if (teamSelected && socketManagerReady && user && !isLoading) {
+      console.log('🎯 Team selected, showing Bluetooth modal...');
       
       // Delay to ensure everything is ready
       setTimeout(() => {
-        // Trigger Bluetooth scanning via window event
-        window.dispatchEvent(new CustomEvent('start-bluetooth-scan'));
+        setShowBluetoothModal(true);
       }, 1000);
     }
-  }, [teamSelected, socketManagerReady, user]);
+  }, [teamSelected, socketManagerReady, user, isLoading]);
 
   const handleNearbyPlayers = (players: any[]) => {
     setNearbyPlayers(players);
@@ -583,6 +603,14 @@ export default function DashboardPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Bluetooth Modal */}
+      <BluetoothModal
+        isOpen={showBluetoothModal}
+        onClose={handleBluetoothModalClose}
+        onStartScan={handleBluetoothModalStart}
+        onError={handleBluetoothModalError}
+      />
 
       {/* Socket Manager */}
       {user && location && (
