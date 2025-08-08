@@ -208,36 +208,13 @@ export default function DashboardPage() {
                 Status Pertempuran
               </h3>
               
-              {activeBattle && activeBattle.pilihanJawaban ? (
-                <div className="space-y-4">
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2">
-                      Battle vs {activeBattle.lawan?.nama || 'Unknown'}
-                    </h4>
-                    <p className="text-sm text-yellow-700 mb-4">{activeBattle.pertanyaan || 'Loading question...'}</p>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
-                        <button
-                          key={key}
-                          onClick={() => handleSubmitAnswer(key)}
-                          className="bg-white border border-yellow-300 rounded-lg p-3 text-sm hover:bg-yellow-50 transition-colors"
-                        >
-                          {key.toUpperCase()}. {value}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-gray-400" />
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Users className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <p className="text-gray-500">Belum ada battle</p>
-                  <p className="text-sm text-gray-400 mt-1">Cari lawan di peta</p>
-                </div>
-              )}
+                <p className="text-gray-500">Belum ada battle</p>
+                <p className="text-sm text-gray-400 mt-1">Cari lawan di peta</p>
+              </div>
             </div>
 
             {/* Nearby Players */}
@@ -269,6 +246,56 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* Active Battle Modal */}
+      <AnimatePresence>
+        {activeBattle && activeBattle.pilihanJawaban && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-gradient-to-br from-red-600 to-red-800 rounded-2xl p-8 text-center max-w-lg mx-4 text-white shadow-2xl"
+            >
+              {/* Battle Header */}
+              <div className="mb-6">
+                <div className="text-4xl mb-2">⚔️</div>
+                <h2 className="text-2xl font-bold mb-2">BATTLE!</h2>
+                <p className="text-red-200">vs {activeBattle.lawan?.nama || 'Unknown'}</p>
+              </div>
+
+              {/* Question */}
+              <div className="mb-6">
+                <p className="text-lg font-semibold mb-4">{activeBattle.pertanyaan}</p>
+              </div>
+
+              {/* Answer Options */}
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                {Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
+                  <button
+                    key={key}
+                    onClick={() => handleSubmitAnswer(key)}
+                    className="bg-white/10 hover:bg-white/20 border border-white/30 rounded-lg p-4 text-sm transition-all duration-200 hover:scale-105"
+                  >
+                    <div className="font-bold text-lg mb-1">{key.toUpperCase()}</div>
+                    <div className="text-sm">{value}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Timer */}
+              <div className="text-red-200 text-sm">
+                ⏰ Jawab cepat untuk menang!
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Battle Result Modal */}
       <AnimatePresence>
