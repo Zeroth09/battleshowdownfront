@@ -238,6 +238,14 @@ io.on('connection', (socket) => {
     if (!battle || battle.selesai) {
       console.log('❌ Battle not found or already finished');
       console.log('❌ Available battle IDs:', Array.from(pertempuranAktif.keys()));
+      
+      // Notify frontend bahwa battle tidak ditemukan
+      socket.emit('battle-error', {
+        message: 'Battle tidak ditemukan atau sudah selesai',
+        battleId,
+        availableBattles: Array.from(pertempuranAktif.keys())
+      });
+      
       return;
     }
 
@@ -359,12 +367,25 @@ io.on('connection', (socket) => {
         if (battle.pemain1.socketId === socket.id || battle.pemain2.socketId === socket.id) {
           console.log(`🗑️ Removing battle ${battleId} due to player disconnect`);
           battlesToRemove.push(battleId);
+          
+          // Notify pemain lain bahwa battle dibatalkan
+          const otherSocketId = battle.pemain1.socketId === socket.id ? battle.pemain2.socketId : battle.pemain1.socketId;
+          io.to(otherSocketId).emit('battle-dibatalkan', { 
+            reason: 'Pemain terputus',
+            battleId 
+          });
         }
       });
       
-      battlesToRemove.forEach(battleId => {
-        pertempuranAktif.delete(battleId);
-      });
+      // Delay removal untuk memberi waktu frontend handle disconnect
+      setTimeout(() => {
+        battlesToRemove.forEach(battleId => {
+          if (pertempuranAktif.has(battleId)) {
+            console.log(`🗑️ Actually removing battle ${battleId} after delay`);
+            pertempuranAktif.delete(battleId);
+          }
+        });
+      }, 5000); // 5 detik delay
       
       // Remove dari Google Sheets
       try {
@@ -397,9 +418,13 @@ function cekJarakPemain(socketId, pemain) {
     );
 
     console.log(`📏 Jarak ${pemain.nama} vs ${dataLawan.nama}: ${jarak.toFixed(2)} meter`);
+    console.log(`📍 Koordinat ${pemain.nama}: ${pemain.lokasi.latitude}, ${pemain.lokasi.longitude}`);
+    console.log(`📍 Koordinat ${dataLawan.nama}: ${dataLawan.lokasi.latitude}, ${dataLawan.lokasi.longitude}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'production'}`);
 
-    // Jika jarak <= 2 meter, trigger battle
-    if (jarak <= 2) {
+    // Jika jarak <= 10 meter, trigger battle (GPS mobile tidak akurat untuk jarak pendek)
+    // Atau jika dalam mode testing (jarak <= 50 meter)
+    if (jarak <= 10 || (jarak <= 50 && process.env.NODE_ENV === 'development')) {
       // Buat lock key untuk mencegah multiple triggers
       const lockKey = [socketId, idLawan].sort().join('_');
       
