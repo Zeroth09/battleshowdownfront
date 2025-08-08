@@ -71,6 +71,20 @@ export default function DashboardPage() {
     }
   }, [socketManagerRef.current, socketManagerReady]);
 
+  // Listen for battle cancellation events
+  useEffect(() => {
+    const handleBattleCancelledEvent = (event: CustomEvent) => {
+      console.log('❌ Received battle-cancelled event:', event.detail);
+      handleBattleCancelled(event.detail);
+    };
+
+    window.addEventListener('battle-dibatalkan', handleBattleCancelledEvent as EventListener);
+    
+    return () => {
+      window.removeEventListener('battle-dibatalkan', handleBattleCancelledEvent as EventListener);
+    };
+  }, []);
+
   useEffect(() => {
     // Ambil tim dari localStorage
     const selectedTeam = localStorage.getItem('selectedTeam') || 'merah';
@@ -163,6 +177,29 @@ export default function DashboardPage() {
     setTimeout(() => {
       setBattleResult(null);
     }, 5000);
+  };
+
+  const handleBattleCancelled = (data: any) => {
+    console.log('❌ handleBattleCancelled called with:', data);
+    
+    // Clear active battle
+    setActiveBattle(null);
+    
+    // Clear localStorage
+    localStorage.removeItem('currentBattle');
+    
+    // Show cancellation message
+    setBattleResult({
+      menang: false,
+      pesan: '❌ BATTLE DIBATALKAN - Pemain terputus'
+    });
+    
+    // Auto-hide result after 3 seconds
+    setTimeout(() => {
+      setBattleResult(null);
+    }, 3000);
+    
+    console.log('✅ Battle cancelled, state cleared');
   };
 
   const handleNearbyPlayers = (players: any[]) => {

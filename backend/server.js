@@ -115,6 +115,29 @@ const pertempuranAktif = new Map(); // battleId -> data pertempuran
 const battleLocks = new Set(); // Mencegah multiple battle triggers
 const locationUpdateTimers = new Map(); // Debounce untuk update location ke Google Sheets
 
+// Periodic cleanup untuk battle yang lama
+setInterval(() => {
+  const now = Date.now();
+  const battlesToRemove = [];
+  
+  pertempuranAktif.forEach((battle, battleId) => {
+    // Hapus battle yang lebih dari 2 menit
+    if (now - battle.waktuMulai > 120000) {
+      console.log(`⏰ Cleaning up old battle: ${battleId}`);
+      battlesToRemove.push(battleId);
+    }
+  });
+  
+  battlesToRemove.forEach(battleId => {
+    pertempuranAktif.delete(battleId);
+  });
+  
+  if (battlesToRemove.length > 0) {
+    console.log(`🧹 Cleaned up ${battlesToRemove.length} old battles`);
+    console.log(`📊 Total battles active: ${pertempuranAktif.size}`);
+  }
+}, 60000); // Check setiap 1 menit
+
 io.on('connection', (socket) => {
   console.log('🟢 Pemain terhubung:', socket.id);
   console.log('📊 Total pemain aktif:', pemainAktif.size);
@@ -123,6 +146,9 @@ io.on('connection', (socket) => {
   socket.onAny((eventName, ...args) => {
     console.log(`📡 Socket ${socket.id} event: ${eventName}`, args);
   });
+  
+  // Debug: log connection state
+  console.log(`🔗 Socket ${socket.id} connected. Total sockets: ${io.engine.clientsCount}`);
   
   // Debug: log connection details
   console.log(`🔗 Socket ${socket.id} connected with events:`, socket.eventNames());
@@ -149,8 +175,11 @@ io.on('connection', (socket) => {
       await googleSheetsService.updatePlayerLocation(socket.id, playerData);
       console.log(`📊 Added ${nama} to Google Sheets`);
     } catch (error) {
-      console.error(`❌ Error adding ${nama} to Google Sheets:`, error.message);
+      console.error('❌ Error adding player to Google Sheets:', error);
     }
+    
+    console.log(`📊 Total pemain aktif setelah bergabung: ${pemainAktif.size}`);
+    console.log(`📊 Active players:`, Array.from(pemainAktif.values()).map(p => `${p.nama} (${p.tim})`));
     
     socket.join(tim); // Join room berdasarkan tim
     socket.emit('bergabung-berhasil', { tim, pemainId });
@@ -320,13 +349,42 @@ io.on('connection', (socket) => {
   socket.on('disconnect', async () => {
     const pemain = pemainAktif.get(socket.id);
     if (pemain) {
+      console.log(`🔴 Pemain terputus: ${socket.id} (${pemain.nama})`);
       socket.to(pemain.tim).emit('pemain-keluar', { nama: pemain.nama });
       pemainAktif.delete(socket.id);
       
+      // Cleanup battles yang melibatkan pemain yang terputus
+      const battlesToRemove = [];
+      pertempuranAktif.forEach((battle, battleId) => {
+        if (battle.pemain1.socketId === socket.id || battle.pemain2.socketId === socket.id) {
+          console.log(`🗑️ Removing battle ${battleId} due to player disconnect`);
+          battlesToRemove.push(battleId);
+          
+          // Notify pemain lain bahwa battle dibatalkan
+          const otherSocketId = battle.pemain1.socketId === socket.id ? battle.pemain2.socketId : battle.pemain1.socketId;
+          io.to(otherSocketId).emit('battle-dibatalkan', { 
+            reason: 'Pemain terputus',
+            battleId 
+          });
+        }
+      });
+      
+      battlesToRemove.forEach(battleId => {
+        pertempuranAktif.delete(battleId);
+      });
+      
       // Remove dari Google Sheets
-      await googleSheetsService.removePlayer(socket.id);
+      try {
+        await googleSheetsService.removePlayer(socket.id);
+      } catch (error) {
+        console.error('❌ Error removing player from Google Sheets:', error);
+      }
+      
+      console.log(`📊 Total pemain aktif setelah disconnect: ${pemainAktif.size}`);
+      console.log(`📊 Total battles aktif setelah disconnect: ${pertempuranAktif.size}`);
+    } else {
+      console.log(`🔴 Socket terputus tanpa data pemain: ${socket.id}`);
     }
-    console.log('Pemain terputus:', socket.id);
   });
 });
 
