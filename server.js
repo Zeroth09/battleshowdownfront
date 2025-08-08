@@ -204,6 +204,7 @@ io.on('connection', (socket) => {
     console.log('📝 Battle found:', battle ? 'yes' : 'no');
     console.log('📝 Battle selesai:', battle?.selesai);
     console.log('📝 Total battles active:', pertempuranAktif.size);
+    console.log('📝 Active battle IDs:', Array.from(pertempuranAktif.keys()));
     
     if (!battle || battle.selesai) {
       console.log('❌ Battle not found or already finished');
@@ -214,6 +215,13 @@ io.on('connection', (socket) => {
     console.log(`📝 ${pemainId} menjawab: ${jawaban} untuk battle ${battleId}`);
     console.log(`📝 Current answers in battle:`, battle.jawaban);
 
+    // Cek apakah pemain sudah jawab sebelumnya
+    const sudahJawab = battle.jawaban.find(j => j.pemainId === pemainId);
+    if (sudahJawab) {
+      console.log(`⚠️ Pemain ${pemainId} sudah jawab sebelumnya, skip`);
+      return;
+    }
+
     // Tambah jawaban ke battle
     battle.jawaban.push({
       pemainId,
@@ -222,6 +230,7 @@ io.on('connection', (socket) => {
     });
 
     console.log(`📝 Total answers now: ${battle.jawaban.length}`);
+    console.log(`📝 Answers from players:`, battle.jawaban.map(j => `${j.pemainId}: ${j.jawaban}`));
 
     // Cek apakah ini jawaban pertama
     if (battle.jawaban.length === 1) {
@@ -356,10 +365,19 @@ function cekJarakPemain(socketId, pemain) {
         // Set lock untuk mencegah multiple triggers
         battleLocks.add(lockKey);
         
-        // Clear lock setelah 5 detik
-        setTimeout(() => {
-          battleLocks.delete(lockKey);
-        }, 5000);
+              // Clear lock setelah 5 detik
+      setTimeout(() => {
+        battleLocks.delete(lockKey);
+      }, 5000);
+      
+      // Cleanup battle yang timeout setelah 30 detik
+      setTimeout(() => {
+        if (pertempuranAktif.has(battleId)) {
+          console.log(`⏰ Battle ${battleId} timeout, clearing...`);
+          pertempuranAktif.delete(battleId);
+          console.log(`📊 Total battles after timeout cleanup: ${pertempuranAktif.size}`);
+        }
+      }, 30000);
         
         triggerBattle(socketId, idLawan, pemain, dataLawan);
       } else {
