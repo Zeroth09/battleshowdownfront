@@ -10,20 +10,25 @@ const SocketManager = dynamic(() => import('../../components/SocketManager'), {
 });
 
 interface User {
-  id: string;
+  pemainId: string;
   nama: string;
   tim: 'merah' | 'putih';
-  latitude: number;
-  longitude: number;
+  lokasi?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface Battle {
   id: string;
   pertanyaan: string;
-  pilihanJawaban: string[];
+  pilihanJawaban: {
+    a: string;
+    b: string;
+    c: string;
+    d: string;
+  };
   jawabanBenar: string;
-  kategori: string;
-  tingkatKesulitan: string;
   lawan: {
     nama: string;
     tim: string;
@@ -176,10 +181,13 @@ export default function EventPage() {
         const mockBattle: Battle = {
           id: `manual_${Date.now()}`,
           pertanyaan: 'Apa ibukota Indonesia?',
-          pilihanJawaban: ['Jakarta', 'Bandung', 'Surabaya', 'Medan'],
+          pilihanJawaban: {
+            a: 'Jakarta',
+            b: 'Bandung',
+            c: 'Surabaya',
+            d: 'Medan'
+          },
           jawabanBenar: 'Jakarta',
-          kategori: 'Umum',
-          tingkatKesulitan: 'Mudah',
           lawan: {
             nama: 'Lawan Manual',
             tim: user.tim === 'merah' ? 'putih' : 'merah'
@@ -368,9 +376,9 @@ export default function EventPage() {
 
                 {/* Answer Choices */}
                 <div className="space-y-3 mb-6">
-                  {activeBattle.pilihanJawaban.map((pilihan, index) => (
+                  {Object.entries(activeBattle.pilihanJawaban).map(([key, pilihan]) => (
                     <button
-                      key={index}
+                      key={key}
                       onClick={() => handleSubmitAnswer(pilihan)}
                       disabled={isSubmitting}
                       className={`w-full p-3 rounded-lg text-left transition-all ${
@@ -379,7 +387,7 @@ export default function EventPage() {
                           : 'bg-black/30 hover:bg-black/50 border border-white/20'
                       } ${isSubmitting ? 'cursor-not-allowed opacity-50' : ''}`}
                     >
-                      <span className="font-bold mr-2">{String.fromCharCode(65 + index)}.</span>
+                      <span className="font-bold mr-2">{key.toUpperCase()}.</span>
                       {pilihan}
                     </button>
                   ))}
@@ -437,13 +445,16 @@ export default function EventPage() {
         </AnimatePresence>
 
         {/* Socket Manager */}
-        <SocketManager
-          ref={socketManagerRef}
-          onReady={handleSocketManagerReady}
-          onBattleStart={handleBattleStart}
-          onBattleEnd={handleBattleEnd}
-          onNearbyPlayers={handleNearbyPlayers}
-        />
+        {user && (
+          <SocketManager
+            ref={socketManagerRef}
+            user={user}
+            onReady={handleSocketManagerReady}
+            onBattleStart={handleBattleStart}
+            onBattleEnd={handleBattleEnd}
+            onNearbyPlayers={handleNearbyPlayers}
+          />
+        )}
       </div>
     </div>
   );
