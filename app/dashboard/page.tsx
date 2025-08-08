@@ -210,7 +210,7 @@ export default function DashboardPage() {
                     <p className="text-sm text-yellow-700 mb-4">{activeBattle.pertanyaan}</p>
                     
                     <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
+                      {activeBattle.pilihanJawaban && Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
                         <button
                           key={key}
                           onClick={() => handleSubmitAnswer(key)}
