@@ -96,7 +96,12 @@ export default function DashboardPage() {
   }, []);
 
   const handleBattleStart = (battleData: Battle) => {
-    setActiveBattle(battleData);
+    // Validate battle data before setting
+    if (battleData && battleData.pilihanJawaban && typeof battleData.pilihanJawaban === 'object') {
+      setActiveBattle(battleData);
+    } else {
+      console.error('Invalid battle data:', battleData);
+    }
   };
 
   const handleBattleEnd = (result: BattleResult) => {
@@ -203,14 +208,16 @@ export default function DashboardPage() {
                 Status Pertempuran
               </h3>
               
-              {activeBattle ? (
+              {activeBattle && activeBattle.pilihanJawaban ? (
                 <div className="space-y-4">
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800 mb-2">Battle vs {activeBattle.lawan.nama}</h4>
-                    <p className="text-sm text-yellow-700 mb-4">{activeBattle.pertanyaan}</p>
+                    <h4 className="font-semibold text-yellow-800 mb-2">
+                      Battle vs {activeBattle.lawan?.nama || 'Unknown'}
+                    </h4>
+                    <p className="text-sm text-yellow-700 mb-4">{activeBattle.pertanyaan || 'Loading question...'}</p>
                     
                     <div className="grid grid-cols-2 gap-2">
-                      {activeBattle.pilihanJawaban && Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
+                      {Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
                         <button
                           key={key}
                           onClick={() => handleSubmitAnswer(key)}
