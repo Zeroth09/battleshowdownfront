@@ -105,6 +105,9 @@ export default function DashboardPage() {
   };
 
   const handleBattleEnd = (result: any) => {
+    console.log('🎯 handleBattleEnd called with:', result);
+    console.log('👤 Current user pemainId:', user?.pemainId);
+    
     // Tentukan pesan berdasarkan hasil
     let pesan = '';
     let menang = false;
@@ -127,6 +130,8 @@ export default function DashboardPage() {
       }
     }
     
+    console.log('🏆 Final result:', { menang, pesan });
+    
     setBattleResult({
       menang,
       pesan
@@ -144,8 +149,15 @@ export default function DashboardPage() {
   };
 
   const handleSubmitAnswer = (answer: string) => {
+    console.log('🎯 handleSubmitAnswer called with:', answer);
+    console.log('🎯 activeBattle:', activeBattle);
+    console.log('🎯 socketManagerRef.current:', socketManagerRef.current);
+    
     if (socketManagerRef.current?.submitAnswer) {
+      console.log('🎯 Calling submitAnswer...');
       socketManagerRef.current.submitAnswer(activeBattle?.id || '', answer);
+    } else {
+      console.error('❌ socketManagerRef.current.submitAnswer is not available');
     }
   };
 

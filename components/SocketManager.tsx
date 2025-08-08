@@ -115,6 +115,7 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
 
     socket.on('battle-selesai', (data) => {
       console.log('🏁 Battle selesai:', data);
+      console.log('📊 Battle result data:', JSON.stringify(data, null, 2));
       onBattleEnd(data);
     });
 
@@ -159,13 +160,20 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
   };
 
   const submitAnswer = (battleId: string, answer: string) => {
+    console.log(`📝 submitAnswer called with battleId: ${battleId}, answer: ${answer}`);
+    console.log(`📝 socketRef.current:`, socketRef.current);
+    console.log(`📝 user.pemainId:`, user.pemainId);
+    
     if (socketRef.current) {
-      console.log(`📝 Submitting answer: ${answer} for battle: ${battleId}`);
+      console.log(`📝 Emitting jawab-battle event...`);
       socketRef.current.emit('jawab-battle', {
         battleId,
         jawaban: answer,
         pemainId: user.pemainId
       });
+      console.log(`📝 Event emitted successfully`);
+    } else {
+      console.error(`❌ socketRef.current is null`);
     }
   };
 
