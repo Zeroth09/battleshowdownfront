@@ -272,19 +272,31 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
       waktuMulai: Date.now()
     });
 
-    // Kirim battle ke kedua pemain
+    // Kirim battle ke kedua pemain dengan format yang benar
     io.to(socketId1).emit('battle-dimulai', {
-      battleId,
-      lawan: pemain2.nama,
-      timLawan: pemain2.tim,
-      pertanyaan: pertanyaan
+      id: battleId,
+      pertanyaan: pertanyaan.pertanyaan,
+      pilihanJawaban: pertanyaan.pilihanJawaban,
+      jawabanBenar: pertanyaan.jawabanBenar,
+      kategori: pertanyaan.kategori,
+      tingkatKesulitan: pertanyaan.tingkatKesulitan,
+      lawan: {
+        nama: pemain2.nama,
+        tim: pemain2.tim
+      }
     });
 
     io.to(socketId2).emit('battle-dimulai', {
-      battleId,
-      lawan: pemain1.nama,
-      timLawan: pemain1.tim,
-      pertanyaan: pertanyaan
+      id: battleId,
+      pertanyaan: pertanyaan.pertanyaan,
+      pilihanJawaban: pertanyaan.pilihanJawaban,
+      jawabanBenar: pertanyaan.jawabanBenar,
+      kategori: pertanyaan.kategori,
+      tingkatKesulitan: pertanyaan.tingkatKesulitan,
+      lawan: {
+        nama: pemain1.nama,
+        tim: pemain1.tim
+      }
     });
 
     // Join kedua pemain ke room battle
