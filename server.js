@@ -303,10 +303,96 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
     io.sockets.sockets.get(socketId1)?.join(battleId);
     io.sockets.sockets.get(socketId2)?.join(battleId);
 
+    console.log(`⚔️ Battle ${battleId} dimulai: ${pemain1.nama} vs ${pemain2.nama}`);
+
   } catch (error) {
     console.error('Error trigger battle:', error);
   }
 }
+
+// Handle jawaban battle
+socket.on('jawab-battle', (data) => {
+  const { battleId, jawaban, pemainId } = data;
+  const battle = pertempuranAktif.get(battleId);
+  
+  if (!battle || battle.selesai) {
+    return;
+  }
+
+  console.log(`📝 ${pemainId} menjawab: ${jawaban} untuk battle ${battleId}`);
+
+  // Tambah jawaban ke battle
+  battle.jawaban.push({
+    pemainId,
+    jawaban,
+    waktu: Date.now()
+  });
+
+  // Cek apakah ini jawaban pertama
+  if (battle.jawaban.length === 1) {
+    // Jawaban pertama - tunggu jawaban kedua
+    console.log(`⏳ Menunggu jawaban kedua untuk battle ${battleId}`);
+  } else if (battle.jawaban.length === 2) {
+    // Kedua pemain sudah jawab - tentukan pemenang
+    const jawaban1 = battle.jawaban[0];
+    const jawaban2 = battle.jawaban[1];
+    
+    const pertanyaan = battle.pertanyaan;
+    const jawabanBenar = pertanyaan.jawabanBenar;
+    
+    // Tentukan pemenang berdasarkan kecepatan dan kebenaran
+    let pemenang = null;
+    let pesan = '';
+    
+    if (jawaban1.jawaban === jawabanBenar && jawaban2.jawaban !== jawabanBenar) {
+      // Pemain 1 benar, pemain 2 salah
+      pemenang = jawaban1.pemainId;
+      pesan = 'Jawaban cepat dan benar!';
+    } else if (jawaban2.jawaban === jawabanBenar && jawaban1.jawaban !== jawabanBenar) {
+      // Pemain 2 benar, pemain 1 salah
+      pemenang = jawaban2.pemainId;
+      pesan = 'Jawaban cepat dan benar!';
+    } else if (jawaban1.jawaban === jawabanBenar && jawaban2.jawaban === jawabanBenar) {
+      // Keduanya benar - yang lebih cepat menang
+      if (jawaban1.waktu < jawaban2.waktu) {
+        pemenang = jawaban1.pemainId;
+        pesan = 'Jawaban cepat dan benar!';
+      } else {
+        pemenang = jawaban2.pemainId;
+        pesan = 'Jawaban cepat dan benar!';
+      }
+    } else {
+      // Keduanya salah - yang lebih cepat "menang" (tapi tetap kalah)
+      if (jawaban1.waktu < jawaban2.waktu) {
+        pemenang = jawaban1.pemainId;
+        pesan = 'Jawaban cepat tapi salah!';
+      } else {
+        pemenang = jawaban2.pemainId;
+        pesan = 'Jawaban cepat tapi salah!';
+      }
+    }
+
+    // Tandai battle selesai
+    battle.selesai = true;
+    battle.pemenang = pemenang;
+    battle.pesan = pesan;
+
+    // Kirim hasil ke kedua pemain
+    const hasilBattle = {
+      pemenang,
+      pesan,
+      jawabanBenar,
+      jawabanPemain: battle.jawaban
+    };
+
+    io.to(battleId).emit('battle-selesai', hasilBattle);
+    
+    // Hapus battle dari memory
+    pertempuranAktif.delete(battleId);
+    
+    console.log(`🏆 Battle ${battleId} selesai. Pemenang: ${pemenang}`);
+  }
+});
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
