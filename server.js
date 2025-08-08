@@ -348,6 +348,8 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
   try {
     // Ambil pertanyaan random dari Google Sheets
     const pertanyaan = await googleSheetsService.getRandomQuestion();
+    
+    console.log('📝 Pertanyaan dari Google Sheets:', pertanyaan);
 
     const battleId = `battle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -369,8 +371,13 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
       }
     }, 30000);
 
-    // Kirim battle ke kedua pemain dengan format yang benar
-    io.to(socketId1).emit('battle-dimulai', {
+    // Validate pertanyaan data
+    if (!pertanyaan.pilihanJawaban || Object.keys(pertanyaan.pilihanJawaban).length === 0) {
+      console.error('❌ Pertanyaan tidak valid:', pertanyaan);
+      return;
+    }
+
+    const battleData = {
       id: battleId,
       pertanyaan: pertanyaan.pertanyaan,
       pilihanJawaban: pertanyaan.pilihanJawaban,
@@ -381,20 +388,13 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
         nama: pemain2.nama,
         tim: pemain2.tim
       }
-    });
+    };
 
-    io.to(socketId2).emit('battle-dimulai', {
-      id: battleId,
-      pertanyaan: pertanyaan.pertanyaan,
-      pilihanJawaban: pertanyaan.pilihanJawaban,
-      jawabanBenar: pertanyaan.jawabanBenar,
-      kategori: pertanyaan.kategori,
-      tingkatKesulitan: pertanyaan.tingkatKesulitan,
-      lawan: {
-        nama: pemain1.nama,
-        tim: pemain1.tim
-      }
-    });
+    console.log('📤 Sending battle data to players:', battleData);
+
+    // Kirim battle ke kedua pemain dengan format yang benar
+    io.to(socketId1).emit('battle-dimulai', battleData);
+    io.to(socketId2).emit('battle-dimulai', battleData);
 
     // Join kedua pemain ke room battle
     io.sockets.sockets.get(socketId1)?.join(battleId);
