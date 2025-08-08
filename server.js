@@ -279,8 +279,18 @@ function cekJarakPemain(socketId, pemain) {
 
     // Jika jarak <= 2 meter, trigger battle
     if (jarak <= 2) {
-      console.log(`⚔️ BATTLE TRIGGERED! ${pemain.nama} vs ${dataLawan.nama} (${jarak.toFixed(2)}m)`);
-      triggerBattle(socketId, idLawan, pemain, dataLawan);
+      // Cek apakah sudah ada battle aktif untuk pemain ini
+      const existingBattle = Array.from(pertempuranAktif.values()).find(battle => 
+        battle.pemain1.socketId === socketId || battle.pemain2.socketId === socketId ||
+        battle.pemain1.socketId === idLawan || battle.pemain2.socketId === idLawan
+      );
+      
+      if (!existingBattle) {
+        console.log(`⚔️ BATTLE TRIGGERED! ${pemain.nama} vs ${dataLawan.nama} (${jarak.toFixed(2)}m)`);
+        triggerBattle(socketId, idLawan, pemain, dataLawan);
+      } else {
+        console.log(`⏸️ Battle sudah aktif untuk ${pemain.nama}, skip trigger`);
+      }
     }
   });
 }
@@ -317,6 +327,15 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
       selesai: false,
       waktuMulai: Date.now()
     });
+
+    // Auto-clear battle setelah 30 detik jika tidak selesai
+    setTimeout(() => {
+      const battle = pertempuranAktif.get(battleId);
+      if (battle && !battle.selesai) {
+        console.log(`⏰ Battle ${battleId} timeout, clearing...`);
+        pertempuranAktif.delete(battleId);
+      }
+    }, 30000);
 
     // Kirim battle ke kedua pemain dengan format yang benar
     io.to(socketId1).emit('battle-dimulai', {
