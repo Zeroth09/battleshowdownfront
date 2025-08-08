@@ -418,9 +418,13 @@ function cekJarakPemain(socketId, pemain) {
     );
 
     console.log(`📏 Jarak ${pemain.nama} vs ${dataLawan.nama}: ${jarak.toFixed(2)} meter`);
+    console.log(`📍 Koordinat ${pemain.nama}: ${pemain.lokasi.latitude}, ${pemain.lokasi.longitude}`);
+    console.log(`📍 Koordinat ${dataLawan.nama}: ${dataLawan.lokasi.latitude}, ${dataLawan.lokasi.longitude}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'production'}`);
 
-    // Jika jarak <= 2 meter, trigger battle
-    if (jarak <= 2) {
+    // Jika jarak <= 10 meter, trigger battle (GPS mobile tidak akurat untuk jarak pendek)
+    // Atau jika dalam mode testing (jarak <= 50 meter)
+    if (jarak <= 10 || (jarak <= 50 && process.env.NODE_ENV === 'development')) {
       // Buat lock key untuk mencegah multiple triggers
       const lockKey = [socketId, idLawan].sort().join('_');
       

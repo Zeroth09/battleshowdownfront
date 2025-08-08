@@ -1,29 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Users, Zap, AlertCircle } from 'lucide-react';
+import dynamic from 'next/dynamic';
 
-// Dynamic imports untuk menghindari SSR issues
 const MapComponent = dynamic(() => import('../../components/MapComponent'), {
   ssr: false,
-  loading: () => (
-    <div className="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center">
-      <div className="text-gray-500">Loading map...</div>
-    </div>
-  ),
 });
 
 const SocketManager = dynamic(() => import('../../components/SocketManager'), {
-  ssr: false,
-});
-
-const BluetoothProximity = dynamic(() => import('../../components/BluetoothProximity'), {
-  ssr: false,
-});
-
-const BluetoothModal = dynamic(() => import('../../components/BluetoothModal'), {
   ssr: false,
 });
 
@@ -60,29 +46,60 @@ interface BattleResult {
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [nearbyPlayers, setNearbyPlayers] = useState<any[]>([]);
-  const [activeBattle, setActiveBattle] = useState<Battle | null>(null);
-  const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [teamSelected, setTeamSelected] = useState(false);
-  const [showBluetoothModal, setShowBluetoothModal] = useState(false);
-  
-  const socketManagerRef = useRef<any>(null);
   const [socketManagerReady, setSocketManagerReady] = useState(false);
   const [socketManagerInstance, setSocketManagerInstance] = useState<any>(null);
+  const [activeBattle, setActiveBattle] = useState<Battle | null>(null);
+  const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nearbyPlayers, setNearbyPlayers] = useState<any[]>([]);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  // Effect untuk memastikan ref siap
+  const socketManagerRef = useRef<any>(null);
+
   useEffect(() => {
-    if (socketManagerRef.current && socketManagerReady) {
-      setSocketManagerInstance(socketManagerRef.current);
-      console.log('✅ SocketManager ref is ready:', socketManagerRef.current);
+    // Load user data from localStorage
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        console.log('👤 User loaded:', parsedUser);
+      } catch (error) {
+        console.error('❌ Error parsing user data:', error);
+        setError('Error loading user data');
+      }
+    } else {
+      setError('User data not found. Please go back to dashboard.');
     }
-  }, [socketManagerRef.current, socketManagerReady]);
+    setIsLoading(false);
+  }, []);
 
-  // Listen for battle cancellation events
   useEffect(() => {
+    // Get user location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setLocation({ latitude, longitude });
+          console.log('📍 Location obtained:', { latitude, longitude });
+        },
+        (error) => {
+          console.error('❌ Error getting location:', error);
+          // Default location (Jakarta)
+          setLocation({ latitude: -6.2088, longitude: 106.8456 });
+        }
+      );
+    } else {
+      // Default location (Jakarta)
+      setLocation({ latitude: -6.2088, longitude: 106.8456 });
+    }
+  }, []);
+
+  useEffect(() => {
+    // Listen for custom events
     const handleBattleCancelledEvent = (event: CustomEvent) => {
       console.log('❌ Received battle-cancelled event:', event.detail);
       handleBattleCancelled(event.detail);
@@ -95,108 +112,48 @@ export default function DashboardPage() {
 
     window.addEventListener('battle-dibatalkan', handleBattleCancelledEvent as EventListener);
     window.addEventListener('battle-error', handleBattleErrorEvent as EventListener);
-    
+
     return () => {
       window.removeEventListener('battle-dibatalkan', handleBattleCancelledEvent as EventListener);
       window.removeEventListener('battle-error', handleBattleErrorEvent as EventListener);
     };
   }, []);
 
-  useEffect(() => {
-    // Ambil tim dari localStorage
-    const selectedTeam = localStorage.getItem('selectedTeam') || 'merah';
-    
-    // Buat user default
-    const defaultUser: User = {
-      pemainId: `player_${Date.now()}`,
-      nama: `Pemain ${Math.floor(Math.random() * 1000)}`,
-      tim: selectedTeam as 'merah' | 'putih',
-    };
-
-    setUser(defaultUser);
-    localStorage.setItem('user', JSON.stringify(defaultUser));
-
-    // Mark team as selected
-    setTeamSelected(true);
-
-    // Get location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setLocation({ latitude, longitude });
-          setIsLoading(false);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          setError('Tidak dapat mengakses lokasi. Pastikan izin lokasi diaktifkan.');
-          setIsLoading(false);
-        }
-      );
-    } else {
-      setError('Geolocation tidak didukung di browser ini.');
-      setIsLoading(false);
-    }
-  }, []);
+  const handleSocketManagerReady = () => {
+    console.log('🔌 Socket manager ready');
+    setSocketManagerReady(true);
+  };
 
   const handleBattleStart = (battleData: Battle) => {
-    console.log('🎯 handleBattleStart called with:', battleData);
+    console.log('⚔️ Battle started:', battleData);
+    setActiveBattle(battleData);
+    setSelectedAnswer(null);
+    setIsSubmitting(false);
     
-    // Validate battle data before setting
-    if (battleData && battleData.pilihanJawaban && typeof battleData.pilihanJawaban === 'object') {
-      console.log('✅ Setting activeBattle with valid data');
-      console.log('🎯 Battle ID:', battleData.id);
-      setActiveBattle(battleData);
-      
-      // Store battle data in localStorage as backup
-      localStorage.setItem('currentBattle', JSON.stringify(battleData));
-      console.log('✅ Battle data stored in localStorage');
-      
-      // Clear any old battle data
-      localStorage.removeItem('oldBattle');
-    } else {
-      console.error('❌ Invalid battle data:', battleData);
-    }
+    // Save to localStorage
+    localStorage.setItem('currentBattle', JSON.stringify(battleData));
   };
 
   const handleBattleEnd = (result: any) => {
-    console.log('🎯 handleBattleEnd called with:', result);
-    console.log('👤 Current user pemainId:', user?.pemainId);
+    console.log('🏁 Battle ended:', result);
     
-    // Tentukan pesan berdasarkan hasil
-    let pesan = '';
-    let menang = false;
+    const battleResultData: BattleResult = {
+      menang: result.menang,
+      pesan: result.menang ? 'LANJUTKAN PERJALANAN!' : 'ULANGI DARI AWAL!'
+    };
     
-    if (result.pemenang === user?.pemainId) {
-      if (result.pesan.includes('benar')) {
-        menang = true;
-        pesan = '🎉 LANJUTKAN PERJALANAN!';
-      } else {
-        menang = false;
-        pesan = '💔 ULANGI DARI AWAL!';
-      }
-    } else {
-      if (result.pesan.includes('benar')) {
-        menang = false;
-        pesan = '💔 ULANGI DARI AWAL!';
-      } else {
-        menang = true;
-        pesan = '🎉 LANJUTKAN PERJALANAN!';
-      }
-    }
-    
-    console.log('🏆 Final result:', { menang, pesan });
-    
-    setBattleResult({
-      menang,
-      pesan
-    });
+    setBattleResult(battleResultData);
     setActiveBattle(null);
+    setSelectedAnswer(null);
+    setIsSubmitting(false);
     
-    // Auto-hide result after 5 seconds
+    // Clear localStorage
+    localStorage.removeItem('currentBattle');
+    
+    // Auto-hide result after 3 seconds
     setTimeout(() => {
       setBattleResult(null);
-    }, 5000);
+    }, 3000);
   };
 
   const handleBattleCancelled = (data: any) => {
@@ -245,51 +202,6 @@ export default function DashboardPage() {
     console.log('✅ Battle error handled, state cleared');
   };
 
-  const handleBluetoothProximity = (distance: number) => {
-    console.log('🎯 Bluetooth proximity detected! Distance:', distance);
-    // Trigger battle via Bluetooth
-    if (socketManagerInstance?.submitAnswer) {
-      console.log('🎯 Triggering battle via Bluetooth proximity...');
-    }
-  };
-
-  const handleBluetoothError = (error: string) => {
-    console.error('❌ Bluetooth error:', error);
-    setError(error);
-  };
-
-  const handleBluetoothStatus = (status: string) => {
-    console.log('📱 Bluetooth status:', status);
-  };
-
-  const handleBluetoothModalClose = () => {
-    setShowBluetoothModal(false);
-  };
-
-  const handleBluetoothModalStart = () => {
-    console.log('🎯 Starting Bluetooth scan from modal...');
-    // Trigger Bluetooth scanning via window event
-    window.dispatchEvent(new CustomEvent('start-bluetooth-scan'));
-    setShowBluetoothModal(false);
-  };
-
-  const handleBluetoothModalError = (error: string) => {
-    console.error('❌ Bluetooth modal error:', error);
-    setError(error);
-  };
-
-  // Show Bluetooth modal after team selection
-  useEffect(() => {
-    if (teamSelected && socketManagerReady && user && !isLoading) {
-      console.log('🎯 Team selected, showing Bluetooth modal...');
-      
-      // Delay to ensure everything is ready
-      setTimeout(() => {
-        setShowBluetoothModal(true);
-      }, 1000);
-    }
-  }, [teamSelected, socketManagerReady, user, isLoading]);
-
   const handleNearbyPlayers = (players: any[]) => {
     setNearbyPlayers(players);
   };
@@ -297,99 +209,44 @@ export default function DashboardPage() {
   const handleSubmitAnswer = (answer: string) => {
     console.log('🎯 handleSubmitAnswer called with:', answer);
     console.log('🎯 activeBattle:', activeBattle);
-    console.log('🎯 socketManagerRef.current:', socketManagerRef.current);
-    console.log('🎯 socketManagerReady:', socketManagerReady);
-    console.log('🎯 socketManagerInstance:', socketManagerInstance);
     
-    // Get battle data from state or localStorage backup
-    let battleData = activeBattle;
-    if (!battleData || !battleData.pilihanJawaban || Object.keys(battleData.pilihanJawaban).length === 0) {
-      console.log('🔄 activeBattle is empty, trying localStorage backup...');
-      const storedBattle = localStorage.getItem('currentBattle');
-      if (storedBattle) {
-        try {
-          battleData = JSON.parse(storedBattle);
-          console.log('✅ Retrieved battle data from localStorage:', battleData);
-        } catch (error) {
-          console.error('❌ Error parsing stored battle data:', error);
-        }
+    if (isSubmitting || !activeBattle) return;
+    
+    setIsSubmitting(true);
+    setSelectedAnswer(answer);
+    
+    try {
+      // Try multiple ways to get submitAnswer function
+      let submitAnswer: any = null;
+      
+      if (socketManagerRef.current?.submitAnswer) {
+        submitAnswer = socketManagerRef.current.submitAnswer;
+      } else if (socketManagerInstance?.submitAnswer) {
+        submitAnswer = socketManagerInstance.submitAnswer;
+      } else if ((window as any).socket?.submitAnswer) {
+        submitAnswer = (window as any).socket.submitAnswer;
       }
-    }
-    
-    if (!battleData || !battleData.id) {
-      console.error('❌ No valid battle data found');
-      return;
-    }
-    
-    // Validate battleId is not test_battle
-    if (battleData.id === 'test_battle') {
-      console.error('❌ Invalid battleId: test_battle');
-      return;
-    }
-    
-    console.log('🎯 Using battleId:', battleData.id);
-    console.log('🎯 Current activeBattle ID:', activeBattle?.id);
-    console.log('🎯 Battle data ID:', battleData.id);
-    
-    // Try multiple ways to get submitAnswer function
-    let submitAnswerFunc = null;
-    
-    if (socketManagerRef.current?.submitAnswer) {
-      submitAnswerFunc = socketManagerRef.current.submitAnswer;
-      console.log('🎯 Found submitAnswer in ref.current');
-    } else if (socketManagerInstance?.submitAnswer) {
-      submitAnswerFunc = socketManagerInstance.submitAnswer;
-      console.log('🎯 Found submitAnswer in instance');
-    }
-    
-    if (submitAnswerFunc && socketManagerReady) {
-      console.log('🎯 Calling submitAnswer...');
-      submitAnswerFunc(battleData.id, answer);
-    } else {
-      console.error('❌ submitAnswer function not available');
-      console.error('❌ socketManagerRef.current:', socketManagerRef.current);
-      console.error('❌ socketManagerInstance:', socketManagerInstance);
-      console.error('❌ socketManagerReady:', socketManagerReady);
       
-      // Wait a bit and try again
-      setTimeout(() => {
-        console.log('🔄 Retrying submitAnswer after delay...');
-        if (socketManagerRef.current?.submitAnswer) {
-          console.log('🎯 Found submitAnswer in retry');
-          socketManagerRef.current.submitAnswer(battleData.id, answer);
-        } else {
-          console.error('❌ Still no submitAnswer available after retry');
-        }
-      }, 1000);
-      
-      // Fallback: try to emit directly if we have socket
-      console.log('🔄 Trying fallback method...');
-      if (typeof window !== 'undefined' && (window as any).socket) {
-        console.log('🎯 Using window.socket fallback');
-        (window as any).socket.emit('jawab-battle', {
-          battleId: battleData.id,
-          jawaban: answer,
-          pemainId: user?.pemainId
-        });
-        console.log('✅ Fallback event emitted successfully');
+      if (submitAnswer) {
+        console.log('🎯 Submitting answer:', answer);
+        submitAnswer(activeBattle.id, answer);
       } else {
-        console.error('❌ No socket available for fallback');
+        console.error('❌ submitAnswer not available');
+        setError('Error submitting answer. Please try again.');
         
-        // Last resort: try to find socket in any way possible
-        console.log('🔄 Trying last resort method...');
-        const socket = (window as any).socket || socketManagerRef.current || socketManagerInstance;
-        if (socket && socket.emit) {
-          console.log('🎯 Using last resort socket');
-          socket.emit('jawab-battle', {
-            battleId: battleData.id,
-            jawaban: answer,
-            pemainId: user?.pemainId
-          });
-          console.log('✅ Last resort event emitted successfully');
-        } else {
-          console.error('❌ No socket found anywhere');
-        }
+        // Retry after 1 second
+        setTimeout(() => {
+          if (socketManagerRef.current?.submitAnswer) {
+            console.log('🎯 Retrying submitAnswer...');
+            socketManagerRef.current.submitAnswer(activeBattle.id, answer);
+          }
+        }, 1000);
       }
+    } catch (error) {
+      console.error('❌ Error submitting answer:', error);
+      setError('Error submitting answer');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -503,141 +360,118 @@ export default function DashboardPage() {
                       <div className={`w-3 h-3 rounded-full ${player.tim === 'merah' ? 'bg-red-500' : 'bg-white border border-gray-300'}`}></div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-800">{player.nama}</p>
-                        <p className="text-sm text-gray-500">Tim {player.tim === 'merah' ? 'Merah' : 'Putih'}</p>
-                      </div>
-                      <div className="text-sm text-gray-400">
-                        {player.jarak ? `${player.jarak.toFixed(1)}m` : 'Nearby'}
+                        <p className="text-sm text-gray-500">Tim {player.tim}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-6">
-                  <p className="text-gray-500">Tidak ada pemain terdekat</p>
-                  <p className="text-sm text-gray-400 mt-1">Bergerak untuk mencari lawan</p>
+                <div className="text-center py-8">
+                  <Users className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">Belum ada pemain terdekat</p>
+                  <p className="text-sm text-gray-400">Bergerak untuk mencari lawan</p>
                 </div>
               )}
-              
-              {/* Bluetooth Proximity */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <BluetoothProximity
-                  onProximityDetected={handleBluetoothProximity}
-                  onError={handleBluetoothError}
-                  onStatusChange={handleBluetoothStatus}
-                />
-              </div>
             </div>
           </div>
         </div>
+
+        {/* Battle Modal */}
+        <AnimatePresence>
+          {activeBattle && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                className="bg-gradient-to-br from-red-900 to-blue-900 rounded-2xl p-6 max-w-md w-full text-white shadow-2xl border border-white/20"
+              >
+                {/* Battle Header */}
+                <div className="text-center mb-6">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <div className={`w-4 h-4 rounded-full ${user?.tim === 'merah' ? 'bg-red-500' : 'bg-white'}`}></div>
+                    <span className="text-sm text-gray-300">vs</span>
+                    <div className={`w-4 h-4 rounded-full ${user?.tim === 'merah' ? 'bg-white' : 'bg-red-500'}`}></div>
+                  </div>
+                  <h3 className="text-lg font-bold">Pertempuran!</h3>
+                  <p className="text-sm text-gray-300">Lawan: {activeBattle.lawan.nama}</p>
+                </div>
+
+                {/* Question */}
+                <div className="bg-black/30 rounded-lg p-4 mb-6">
+                  <h4 className="font-bold mb-2">Pertanyaan:</h4>
+                  <p className="text-gray-200">{activeBattle.pertanyaan}</p>
+                </div>
+
+                {/* Answer Choices */}
+                <div className="space-y-3 mb-6">
+                  {Object.entries(activeBattle.pilihanJawaban).map(([key, pilihan]) => (
+                    <button
+                      key={key}
+                      onClick={() => handleSubmitAnswer(pilihan)}
+                      disabled={isSubmitting}
+                      className={`w-full p-3 rounded-lg text-left transition-all ${
+                        selectedAnswer === pilihan
+                          ? 'bg-blue-600 border-2 border-blue-400'
+                          : 'bg-black/30 hover:bg-black/50 border border-white/20'
+                      } ${isSubmitting ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      <span className="font-bold mr-2">{key.toUpperCase()}.</span>
+                      {pilihan}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Battle Result Modal */}
+        <AnimatePresence>
+          {battleResult && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                className={`bg-white rounded-lg p-8 text-center max-w-md mx-4 ${
+                  battleResult.menang ? 'border-4 border-green-500' : 'border-4 border-red-500'
+                }`}
+              >
+                <div className={`text-6xl mb-4 ${battleResult.menang ? 'text-green-500' : 'text-red-500'}`}>
+                  {battleResult.menang ? '🎉' : '💔'}
+                </div>
+                <h3 className={`text-2xl font-bold mb-2 ${battleResult.menang ? 'text-green-600' : 'text-red-600'}`}>
+                  {battleResult.menang ? 'MENANG!' : 'KALAH'}
+                </h3>
+                <p className="text-gray-600">{battleResult.pesan}</p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Socket Manager */}
+        {user && (
+          <SocketManager
+            ref={socketManagerRef}
+            user={user}
+            onReady={handleSocketManagerReady}
+            onBattleStart={handleBattleStart}
+            onBattleEnd={handleBattleEnd}
+            onNearbyPlayers={handleNearbyPlayers}
+          />
+        )}
       </main>
-
-      {/* Active Battle Modal */}
-      <AnimatePresence>
-        {activeBattle && activeBattle.pilihanJawaban && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] pointer-events-auto"
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-gradient-to-br from-red-600 to-red-800 rounded-2xl p-8 text-center max-w-lg mx-4 text-white shadow-2xl"
-            >
-              {/* Battle Header */}
-              <div className="mb-6">
-                <div className="text-4xl mb-2">⚔️</div>
-                <h2 className="text-2xl font-bold mb-2">BATTLE!</h2>
-                <p className="text-red-200">vs {activeBattle.lawan?.nama || 'Unknown'}</p>
-              </div>
-
-              {/* Question */}
-              <div className="mb-6">
-                <p className="text-lg font-semibold mb-4">{activeBattle.pertanyaan}</p>
-              </div>
-
-              {/* Answer Options */}
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                {Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
-                  <button
-                    key={key}
-                    onClick={() => handleSubmitAnswer(key)}
-                    className="bg-white/10 hover:bg-white/20 border border-white/30 rounded-lg p-4 text-sm transition-all duration-200 hover:scale-105"
-                  >
-                    <div className="font-bold text-lg mb-1">{key.toUpperCase()}</div>
-                    <div className="text-sm">{value}</div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Timer */}
-              <div className="text-red-200 text-sm">
-                ⏰ Jawab cepat untuk menang!
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Battle Result Modal */}
-      <AnimatePresence>
-        {battleResult && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className={`bg-white rounded-lg p-8 text-center max-w-md mx-4 ${
-                battleResult.menang ? 'border-4 border-green-500' : 'border-4 border-red-500'
-              }`}
-            >
-              <div className={`text-6xl mb-4 ${battleResult.menang ? 'text-green-500' : 'text-red-500'}`}>
-                {battleResult.menang ? '🎉' : '💔'}
-              </div>
-              <h3 className={`text-2xl font-bold mb-2 ${battleResult.menang ? 'text-green-600' : 'text-red-600'}`}>
-                {battleResult.menang ? 'MENANG!' : 'KALAH'}
-              </h3>
-              <p className="text-gray-600">{battleResult.pesan}</p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Bluetooth Modal */}
-      <BluetoothModal
-        isOpen={showBluetoothModal}
-        onClose={handleBluetoothModalClose}
-        onStartScan={handleBluetoothModalStart}
-        onError={handleBluetoothModalError}
-      />
-
-      {/* Socket Manager */}
-      {user && location && (
-        <SocketManager
-          ref={socketManagerRef}
-          user={user}
-          initialLocation={location}
-          onBattleStart={handleBattleStart}
-          onBattleEnd={handleBattleEnd}
-          onNearbyPlayers={handleNearbyPlayers}
-          onReady={() => {
-            console.log('✅ SocketManager ready!');
-            setSocketManagerReady(true);
-            // Also store the instance
-            if (socketManagerRef.current) {
-              setSocketManagerInstance(socketManagerRef.current);
-              console.log('✅ SocketManager instance stored');
-            }
-          }}
-        />
-      )}
     </div>
   );
 } 
