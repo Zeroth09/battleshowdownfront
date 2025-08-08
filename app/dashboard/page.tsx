@@ -19,6 +19,14 @@ const SocketManager = dynamic(() => import('../../components/SocketManager'), {
   ssr: false,
 });
 
+const ManualProximity = dynamic(() => import('../../components/ManualProximity'), {
+  ssr: false,
+});
+
+const BluetoothProximity = dynamic(() => import('../../components/BluetoothProximity'), {
+  ssr: false,
+});
+
 interface User {
   pemainId: string;
   nama: string;
@@ -230,6 +238,32 @@ export default function DashboardPage() {
     }, 3000);
     
     console.log('✅ Battle error handled, state cleared');
+  };
+
+  const handleManualProximity = () => {
+    console.log('🎯 Manual proximity trigger activated!');
+    // Trigger battle manually
+    if (socketManagerInstance?.submitAnswer) {
+      // Simulate battle trigger
+      console.log('🎯 Simulating battle trigger...');
+    }
+  };
+
+  const handleBluetoothProximity = (distance: number) => {
+    console.log('🎯 Bluetooth proximity detected! Distance:', distance);
+    // Trigger battle via Bluetooth
+    if (socketManagerInstance?.submitAnswer) {
+      console.log('🎯 Triggering battle via Bluetooth proximity...');
+    }
+  };
+
+  const handleBluetoothError = (error: string) => {
+    console.error('❌ Bluetooth error:', error);
+    setError(error);
+  };
+
+  const handleBluetoothStatus = (status: string) => {
+    console.log('📱 Bluetooth status:', status);
   };
 
   const handleNearbyPlayers = (players: any[]) => {
@@ -453,6 +487,15 @@ export default function DashboardPage() {
                   <p className="text-sm text-gray-400 mt-1">Bergerak untuk mencari lawan</p>
                 </div>
               )}
+              
+              {/* Bluetooth Proximity */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <BluetoothProximity
+                  onProximityDetected={handleBluetoothProximity}
+                  onError={handleBluetoothError}
+                  onStatusChange={handleBluetoothStatus}
+                />
+              </div>
             </div>
           </div>
         </div>
