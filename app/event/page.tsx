@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sword, Users, Target, Zap, Clock, Crown, Radio } from 'lucide-react';
+import { Users, Zap, Clock, Crown, Radio, Trophy, Target } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const SocketManager = dynamic(() => import('../../components/SocketManager'), {
@@ -50,7 +50,7 @@ export default function EventPage() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nearbyPlayers, setNearbyPlayers] = useState<any[]>([]);
-  const [battleStatus, setBattleStatus] = useState<string>('Menunggu Game Master');
+  const [battleStatus, setBattleStatus] = useState<string>('Menunggu Pertanyaan');
   const [isGameMaster, setIsGameMaster] = useState(false);
   const [lobbyPlayers, setLobbyPlayers] = useState<any[]>([]);
 
@@ -89,7 +89,7 @@ export default function EventPage() {
   const handleBattleStart = (battleData: Battle) => {
     console.log('⚔️ Battle started:', battleData);
     setActiveBattle(battleData);
-    setBattleStatus('Pertempuran Aktif!');
+    setBattleStatus('Pertanyaan Aktif!');
     setSelectedAnswer(null);
     setIsSubmitting(false);
     
@@ -107,7 +107,7 @@ export default function EventPage() {
     
     setBattleResult(battleResultData);
     setActiveBattle(null);
-    setBattleStatus('Menunggu Game Master');
+    setBattleStatus('Menunggu Pertanyaan');
     setSelectedAnswer(null);
     setIsSubmitting(false);
     
@@ -162,35 +162,35 @@ export default function EventPage() {
   const handleBattleCancelled = () => {
     console.log('❌ Battle cancelled');
     setActiveBattle(null);
-    setBattleStatus('Battle Dibatalkan - Pemain Terputus');
+    setBattleStatus('Pertanyaan Dibatalkan');
     localStorage.removeItem('currentBattle');
     
     setTimeout(() => {
-      setBattleStatus('Menunggu Game Master');
+      setBattleStatus('Menunggu Pertanyaan');
     }, 3000);
   };
 
   const handleBattleError = () => {
     console.log('❌ Battle error');
     setActiveBattle(null);
-    setBattleStatus('Battle Error - Battle Tidak Ditemukan');
+    setBattleStatus('Error - Pertanyaan Tidak Ditemukan');
     localStorage.removeItem('currentBattle');
     
     setTimeout(() => {
-      setBattleStatus('Menunggu Game Master');
+      setBattleStatus('Menunggu Pertanyaan');
     }, 3000);
   };
 
-  const triggerBattleForAll = async () => {
+  const triggerQuestionForAll = async () => {
     if (!user || !isGameMaster) return;
     
-    setBattleStatus('Memulai Battle untuk Semua Peserta...');
+    setBattleStatus('Memulai Pertanyaan untuk Semua Peserta...');
     
     try {
-      // Simulate battle for all participants
+      // Simulate question for all participants
       setTimeout(() => {
         const mockBattle: Battle = {
-          id: `global_${Date.now()}`,
+          id: `question_${Date.now()}`,
           pertanyaan: 'Apa ibukota Indonesia?',
           pilihanJawaban: {
             a: 'Jakarta',
@@ -211,16 +211,16 @@ export default function EventPage() {
             battleData: mockBattle,
             gameMasterId: user.pemainId
           });
-          console.log('🎯 Game Master triggered global battle');
+          console.log('🎯 Game Master triggered global question');
         }
         
-        setBattleStatus('Battle Dimulai untuk Semua Peserta!');
+        setBattleStatus('Pertanyaan Dimulai untuk Semua Peserta!');
       }, 2000);
       
     } catch (error) {
-      console.error('❌ Error triggering global battle:', error);
-      setError('Error triggering battle');
-      setBattleStatus('Menunggu Game Master');
+      console.error('❌ Error triggering global question:', error);
+      setError('Error triggering question');
+      setBattleStatus('Menunggu Pertanyaan');
     }
   };
 
@@ -236,7 +236,7 @@ export default function EventPage() {
         result,
         gameMasterId: user.pemainId
       });
-      console.log('🎯 Game Master ended global battle');
+      console.log('🎯 Game Master ended global question');
     }
     
     handleBattleEnd(result);
@@ -244,10 +244,10 @@ export default function EventPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-900 via-purple-900 to-blue-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center text-white">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Loading Event Page...</p>
+          <p>Loading Lomba...</p>
         </div>
       </div>
     );
@@ -255,7 +255,7 @@ export default function EventPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-900 via-purple-900 to-blue-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center text-white">
           <div className="text-red-400 text-6xl mb-4">❌</div>
           <h2 className="text-2xl font-bold mb-2">Error</h2>
@@ -273,7 +273,7 @@ export default function EventPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-900 via-purple-900 to-blue-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center text-white">
           <div className="text-red-400 text-6xl mb-4">👤</div>
           <h2 className="text-2xl font-bold mb-2">User Not Found</h2>
@@ -290,20 +290,20 @@ export default function EventPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-900 via-purple-900 to-blue-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white">
       {/* Header */}
-      <div className="bg-black/30 backdrop-blur-sm border-b border-white/20">
+      <div className="bg-black/20 backdrop-blur-sm border-b border-white/20">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-full ${user.tim === 'merah' ? 'bg-red-600' : 'bg-white'}`}></div>
+              <Trophy className="w-8 h-8 text-yellow-400" />
               <div>
-                <h1 className="text-xl font-bold">Event Battle</h1>
+                <h1 className="text-xl font-bold">Lomba Battle</h1>
                 <p className="text-sm text-gray-300">Tim {user.tim.toUpperCase()}</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-300">Player</p>
+              <p className="text-sm text-gray-300">Peserta</p>
               <p className="font-bold">{user.nama}</p>
               {isGameMaster && (
                 <div className="flex items-center gap-1 mt-1">
@@ -328,13 +328,13 @@ export default function EventPage() {
         <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-white/20">
           <div className="flex items-center gap-3 mb-4">
             <Zap className="w-6 h-6 text-yellow-400" />
-            <h2 className="text-lg font-bold">Status Pertempuran</h2>
+            <h2 className="text-lg font-bold">Status Lomba</h2>
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-yellow-400">{battleStatus}</p>
             {nearbyPlayers.length > 0 && (
               <p className="text-sm text-gray-300 mt-2">
-                {nearbyPlayers.length} pemain terdekat terdeteksi
+                {nearbyPlayers.length} peserta terdeteksi
               </p>
             )}
           </div>
@@ -349,20 +349,20 @@ export default function EventPage() {
           >
             <div className="text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Crown className="w-10 h-10 text-white" />
+                <Target className="w-10 h-10 text-white" />
               </div>
               <h3 className="text-xl font-bold mb-2">Game Master Controls</h3>
               <p className="text-gray-300 mb-6">
-                Klik tombol di bawah untuk memulai pertempuran untuk semua peserta
+                Klik tombol di bawah untuk memulai pertanyaan untuk semua peserta
               </p>
               
               <button
-                onClick={triggerBattleForAll}
+                onClick={triggerQuestionForAll}
                 className="w-full py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 transform bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 hover:scale-105 active:scale-95"
               >
                 <div className="flex items-center justify-center gap-2">
                   <Radio className="w-5 h-5" />
-                  <span>🎯 TRIGGER BATTLE UNTUK SEMUA</span>
+                  <span>🎯 TRIGGER PERTANYAAN</span>
                 </div>
               </button>
             </div>
@@ -396,7 +396,7 @@ export default function EventPage() {
           </motion.div>
         )}
 
-        {/* Participant Waiting */}
+        {/* Participant Waiting Room */}
         {!isGameMaster && !activeBattle && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -407,20 +407,20 @@ export default function EventPage() {
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Clock className="w-10 h-10 text-white" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Menunggu Game Master</h3>
+              <h3 className="text-xl font-bold mb-2">Waiting Room</h3>
               <p className="text-gray-300 mb-6">
-                Game Master akan memulai pertempuran. Bersiaplah!
+                Menunggu pertanyaan dari Game Master. Bersiaplah!
               </p>
               
               <div className="flex items-center justify-center gap-2 text-blue-300">
                 <div className="animate-pulse">⏳</div>
-                <span>Menunggu...</span>
+                <span>Menunggu pertanyaan...</span>
               </div>
             </div>
           </motion.div>
         )}
 
-        {/* Battle Modal */}
+        {/* Question Modal */}
         <AnimatePresence>
           {activeBattle && (
             <motion.div
@@ -433,17 +433,15 @@ export default function EventPage() {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
-                className="bg-gradient-to-br from-red-900 to-blue-900 rounded-2xl p-6 max-w-md w-full text-white shadow-2xl border border-white/20"
+                className="bg-gradient-to-br from-purple-900 to-blue-900 rounded-2xl p-6 max-w-md w-full text-white shadow-2xl border border-white/20"
               >
-                {/* Battle Header */}
+                {/* Question Header */}
                 <div className="text-center mb-6">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    <div className={`w-4 h-4 rounded-full ${user.tim === 'merah' ? 'bg-red-500' : 'bg-white'}`}></div>
-                    <span className="text-sm text-gray-300">vs</span>
-                    <div className={`w-4 h-4 rounded-full ${user.tim === 'merah' ? 'bg-white' : 'bg-red-500'}`}></div>
+                  <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Target className="w-8 h-8 text-white" />
                   </div>
-                  <h3 className="text-lg font-bold">Pertempuran!</h3>
-                  <p className="text-sm text-gray-300">Lawan: {activeBattle.lawan.nama}</p>
+                  <h3 className="text-lg font-bold">Pertanyaan Lomba!</h3>
+                  <p className="text-sm text-gray-300">Jawab dengan cepat dan benar</p>
                 </div>
 
                 {/* Question */}
