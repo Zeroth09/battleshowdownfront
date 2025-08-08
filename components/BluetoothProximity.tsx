@@ -27,12 +27,26 @@ export default function BluetoothProximity({
 
   useEffect(() => {
     checkBluetoothSupport();
+    
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    
+    // Auto-start scanning after 2 seconds
+    const autoStartTimer = setTimeout(() => {
+      if (isSupported) {
+        startScanning();
+      }
+    }, 2000);
+    
     return () => {
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
       }
+      clearTimeout(autoStartTimer);
     };
-  }, []);
+  }, [isSupported]);
 
   const checkBluetoothSupport = () => {
     if (!navigator.bluetooth) {
@@ -151,6 +165,15 @@ export default function BluetoothProximity({
       // Check if device is close enough
       if (distance <= 2) {
         console.log(`🎯 Proximity detected! Device: ${device.name}, Distance: ${distance.toFixed(2)}m`);
+        
+        // Show notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('⚔️ Battle Dimulai!', {
+            body: `Device terdeteksi dalam jarak ${distance.toFixed(2)}m`,
+            icon: '/favicon.ico'
+          });
+        }
+        
         onProximityDetected(distance);
       }
 
@@ -195,7 +218,7 @@ export default function BluetoothProximity({
   return (
     <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
       <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-        📱 Bluetooth Proximity
+        📱 Auto Proximity Detection
       </h3>
       
       {/* Status */}
@@ -215,37 +238,24 @@ export default function BluetoothProximity({
             <span className="text-green-400">Izin Diberikan</span>
           </div>
         )}
+        
+        {isScanning && (
+          <div className="flex items-center gap-2 text-sm mt-1">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+            <span className="text-blue-400">Auto Scanning Aktif</span>
+          </div>
+        )}
       </div>
 
-      {/* Controls */}
-      <div className="flex gap-2 mb-4">
-        {!isScanning ? (
-          <button
-            onClick={startScanning}
-            disabled={!isSupported}
-            className={`px-4 py-2 rounded text-sm font-medium transition-all ${
-              isSupported
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-gray-500 text-gray-300 cursor-not-allowed'
-            }`}
-          >
-            🔍 Mulai Scan
-          </button>
-        ) : (
-          <button
-            onClick={stopScanning}
-            className="px-4 py-2 rounded text-sm font-medium bg-red-600 hover:bg-red-700 text-white"
-          >
-            ⏹️ Stop Scan
-          </button>
-        )}
-        
-        <button
-          onClick={clearDevices}
-          className="px-4 py-2 rounded text-sm font-medium bg-gray-600 hover:bg-gray-700 text-white"
-        >
-          🗑️ Clear
-        </button>
+      {/* Auto Status */}
+      <div className="mb-4 p-3 bg-blue-500/20 rounded border border-blue-500/30">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+          <span className="text-blue-300 text-sm font-medium">Auto Mode</span>
+        </div>
+        <p className="text-blue-200 text-xs">
+          Scanning otomatis aktif. Dekatkan device lain untuk memulai battle!
+        </p>
       </div>
 
       {/* Devices List */}
@@ -284,12 +294,13 @@ export default function BluetoothProximity({
       )}
 
       {/* Instructions */}
-      <div className="mt-4 p-3 bg-blue-500/20 rounded border border-blue-500/30">
-        <h4 className="text-blue-300 text-sm font-medium mb-2">📋 Cara Kerja:</h4>
-        <ul className="text-blue-200 text-xs space-y-1">
-          <li>• Klik "Mulai Scan" untuk mencari devices Bluetooth</li>
-          <li>• Devices dalam jarak ≤2m akan trigger battle</li>
-          <li>• RSSI (signal strength) menentukan jarak</li>
+      <div className="mt-4 p-3 bg-green-500/20 rounded border border-green-500/30">
+        <h4 className="text-green-300 text-sm font-medium mb-2">🎯 Cara Kerja Otomatis:</h4>
+        <ul className="text-green-200 text-xs space-y-1">
+          <li>• Scanning otomatis aktif setelah 2 detik</li>
+          <li>• Dekatkan device lain dalam jarak ≤2m</li>
+          <li>• Battle akan dimulai otomatis</li>
+          <li>• Notifikasi akan muncul saat battle dimulai</li>
           <li>• Hanya bekerja di Chrome/Edge dengan HTTPS</li>
         </ul>
       </div>
