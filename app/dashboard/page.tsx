@@ -62,6 +62,7 @@ export default function DashboardPage() {
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [teamSelected, setTeamSelected] = useState(false);
   
   const socketManagerRef = useRef<any>(null);
   const [socketManagerReady, setSocketManagerReady] = useState(false);
@@ -109,6 +110,9 @@ export default function DashboardPage() {
 
     setUser(defaultUser);
     localStorage.setItem('user', JSON.stringify(defaultUser));
+
+    // Mark team as selected
+    setTeamSelected(true);
 
     // Get location
     if (navigator.geolocation) {
@@ -252,6 +256,19 @@ export default function DashboardPage() {
   const handleBluetoothStatus = (status: string) => {
     console.log('📱 Bluetooth status:', status);
   };
+
+  // Auto-trigger Bluetooth scanning after team selection
+  useEffect(() => {
+    if (teamSelected && socketManagerReady && user) {
+      console.log('🎯 Team selected, auto-triggering Bluetooth scan...');
+      
+      // Delay to ensure everything is ready
+      setTimeout(() => {
+        // Trigger Bluetooth scanning via window event
+        window.dispatchEvent(new CustomEvent('start-bluetooth-scan'));
+      }, 1000);
+    }
+  }, [teamSelected, socketManagerReady, user]);
 
   const handleNearbyPlayers = (players: any[]) => {
     setNearbyPlayers(players);

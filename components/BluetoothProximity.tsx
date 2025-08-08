@@ -33,9 +33,20 @@ export default function BluetoothProximity({
       Notification.requestPermission();
     }
     
-    // Don't auto-start scanning (needs user gesture)
-    // User must click to start
-  }, [isSupported]);
+    // Listen for auto-start event
+    const handleAutoStart = () => {
+      console.log('🎯 Received auto-start event for Bluetooth scan');
+      if (isSupported && !isScanning) {
+        startScanning();
+      }
+    };
+
+    window.addEventListener('start-bluetooth-scan', handleAutoStart);
+    
+    return () => {
+      window.removeEventListener('start-bluetooth-scan', handleAutoStart);
+    };
+  }, [isSupported, isScanning]);
 
   const checkBluetoothSupport = () => {
     if (!navigator.bluetooth) {
@@ -236,21 +247,21 @@ export default function BluetoothProximity({
         )}
       </div>
 
-      {/* Manual Start Button */}
+      {/* Auto Start Status */}
       {!isScanning && isSupported && (
-        <div className="mb-4 p-3 bg-blue-500/20 rounded border border-blue-500/30">
+        <div className="mb-4 p-3 bg-green-500/20 rounded border border-green-500/30">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-            <span className="text-blue-300 text-sm font-medium">Manual Start</span>
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            <span className="text-green-300 text-sm font-medium">Auto Start</span>
           </div>
-          <p className="text-blue-200 text-xs mb-3">
-            Klik tombol di bawah untuk memulai scanning Bluetooth
+          <p className="text-green-200 text-xs mb-3">
+            Scanning akan dimulai otomatis setelah tim dipilih
           </p>
           <button
             onClick={startScanning}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-all"
+            className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-all"
           >
-            🔍 Mulai Bluetooth Scan
+            🔍 Mulai Bluetooth Scan Manual
           </button>
         </div>
       )}
@@ -311,9 +322,9 @@ export default function BluetoothProximity({
 
       {/* Instructions */}
       <div className="mt-4 p-3 bg-green-500/20 rounded border border-green-500/30">
-        <h4 className="text-green-300 text-sm font-medium mb-2">🎯 Cara Kerja:</h4>
+        <h4 className="text-green-300 text-sm font-medium mb-2">🎯 Cara Kerja Otomatis:</h4>
         <ul className="text-green-200 text-xs space-y-1">
-          <li>• Klik "Mulai Bluetooth Scan" untuk memulai</li>
+          <li>• Scanning dimulai otomatis setelah tim dipilih</li>
           <li>• Izinkan Bluetooth saat browser minta izin</li>
           <li>• Dekatkan device lain dalam jarak ≤2m</li>
           <li>• Battle akan dimulai otomatis</li>
