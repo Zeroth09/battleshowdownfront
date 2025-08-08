@@ -296,7 +296,7 @@ async function triggerBattle(socketId1, socketId2, pemain1, pemain2) {
   }
 }
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`Server berjalan di port ${PORT}`);
   console.log('🚀 Sistem deteksi pemain siap!');
