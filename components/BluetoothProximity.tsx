@@ -50,8 +50,7 @@ export default function BluetoothProximity({
       
       // Check if Bluetooth is available
       if (!navigator.bluetooth) {
-        onError('Bluetooth tidak tersedia');
-        return false;
+        throw new Error('Bluetooth tidak tersedia');
       }
       
       // Request Bluetooth device to trigger permission
@@ -116,8 +115,7 @@ export default function BluetoothProximity({
     try {
       // Check if Bluetooth is available
       if (!navigator.bluetooth) {
-        onError('Bluetooth tidak tersedia');
-        return;
+        throw new Error('Bluetooth tidak tersedia');
       }
       
       // Request device with specific filters
