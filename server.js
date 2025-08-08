@@ -118,6 +118,11 @@ const locationUpdateTimers = new Map(); // Debounce untuk update location ke Goo
 io.on('connection', (socket) => {
   console.log('🟢 Pemain terhubung:', socket.id);
   console.log('📊 Total pemain aktif:', pemainAktif.size);
+  
+  // Debug: log all events
+  socket.onAny((eventName, ...args) => {
+    console.log(`📡 Socket ${socket.id} event: ${eventName}`, args);
+  });
 
   // Pemain bergabung dengan tim
   socket.on('bergabung-tim', async (data) => {
@@ -185,6 +190,9 @@ io.on('connection', (socket) => {
   // Handle jawaban battle
   socket.on('jawab-battle', (data) => {
     console.log('📝 Received jawab-battle event:', data);
+    console.log('📝 Socket ID:', socket.id);
+    console.log('📝 All active battles:', Array.from(pertempuranAktif.keys()));
+    
     const { battleId, jawaban, pemainId } = data;
     const battle = pertempuranAktif.get(battleId);
     
@@ -194,6 +202,7 @@ io.on('connection', (socket) => {
     
     if (!battle || battle.selesai) {
       console.log('❌ Battle not found or already finished');
+      console.log('❌ Available battle IDs:', Array.from(pertempuranAktif.keys()));
       return;
     }
 
@@ -337,6 +346,7 @@ function cekJarakPemain(socketId, pemain) {
       
       if (!existingBattle && !battleLocks.has(lockKey)) {
         console.log(`⚔️ BATTLE TRIGGERED! ${pemain.nama} vs ${dataLawan.nama} (${jarak.toFixed(2)}m)`);
+        console.log(`📊 Total battles before trigger: ${pertempuranAktif.size}`);
         
         // Set lock untuk mencegah multiple triggers
         battleLocks.add(lockKey);
@@ -349,6 +359,9 @@ function cekJarakPemain(socketId, pemain) {
         triggerBattle(socketId, idLawan, pemain, dataLawan);
       } else {
         console.log(`⏸️ Battle sudah aktif atau locked untuk ${pemain.nama}, skip trigger`);
+        if (existingBattle) {
+          console.log(`📊 Existing battle found for ${pemain.nama}`);
+        }
       }
     }
   });
