@@ -124,16 +124,6 @@ export default function DashboardPage() {
     setSocketManagerReady(true);
   };
 
-  const handleBattleStart = (battleData: Battle) => {
-    console.log('⚔️ Battle started:', battleData);
-    setActiveBattle(battleData);
-    setSelectedAnswer(null);
-    setIsSubmitting(false);
-    
-    // Save to localStorage
-    localStorage.setItem('currentBattle', JSON.stringify(battleData));
-  };
-
   const handleBattleEnd = (result: any) => {
     console.log('🏁 Battle ended:', result);
     
@@ -204,6 +194,12 @@ export default function DashboardPage() {
 
   const handleNearbyPlayers = (players: any[]) => {
     setNearbyPlayers(players);
+  };
+
+  // Disable auto battle trigger - only manual in event page
+  const handleBattleStart = (battleData: Battle) => {
+    console.log('⚔️ Auto battle disabled - use event page for manual battles');
+    // Don't start battle automatically
   };
 
   const handleSubmitAnswer = (answer: string) => {
