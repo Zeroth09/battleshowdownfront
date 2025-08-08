@@ -184,14 +184,21 @@ io.on('connection', (socket) => {
 
   // Handle jawaban battle
   socket.on('jawab-battle', (data) => {
+    console.log('📝 Received jawab-battle event:', data);
     const { battleId, jawaban, pemainId } = data;
     const battle = pertempuranAktif.get(battleId);
     
+    console.log('📝 Battle found:', battle ? 'yes' : 'no');
+    console.log('📝 Battle selesai:', battle?.selesai);
+    console.log('📝 Total battles active:', pertempuranAktif.size);
+    
     if (!battle || battle.selesai) {
+      console.log('❌ Battle not found or already finished');
       return;
     }
 
     console.log(`📝 ${pemainId} menjawab: ${jawaban} untuk battle ${battleId}`);
+    console.log(`📝 Current answers in battle:`, battle.jawaban);
 
     // Tambah jawaban ke battle
     battle.jawaban.push({
@@ -200,17 +207,25 @@ io.on('connection', (socket) => {
       waktu: Date.now()
     });
 
+    console.log(`📝 Total answers now: ${battle.jawaban.length}`);
+
     // Cek apakah ini jawaban pertama
     if (battle.jawaban.length === 1) {
       // Jawaban pertama - tunggu jawaban kedua
       console.log(`⏳ Menunggu jawaban kedua untuk battle ${battleId}`);
     } else if (battle.jawaban.length === 2) {
       // Kedua pemain sudah jawab - tentukan pemenang
+      console.log(`🏁 Kedua pemain sudah jawab, menentukan pemenang...`);
+      
       const jawaban1 = battle.jawaban[0];
       const jawaban2 = battle.jawaban[1];
       
       const pertanyaan = battle.pertanyaan;
       const jawabanBenar = pertanyaan.jawabanBenar;
+      
+      console.log(`📊 Jawaban 1: ${jawaban1.jawaban} (${jawaban1.pemainId})`);
+      console.log(`📊 Jawaban 2: ${jawaban2.jawaban} (${jawaban2.pemainId})`);
+      console.log(`📊 Jawaban benar: ${jawabanBenar}`);
       
       // Tentukan pemenang berdasarkan kecepatan dan kebenaran
       let pemenang = null;
@@ -244,6 +259,8 @@ io.on('connection', (socket) => {
         }
       }
 
+      console.log(`🏆 Pemenang: ${pemenang}, Pesan: ${pesan}`);
+
       // Tandai battle selesai
       battle.selesai = true;
       battle.pemenang = pemenang;
@@ -257,6 +274,7 @@ io.on('connection', (socket) => {
         jawabanPemain: battle.jawaban
       };
 
+      console.log('📤 Sending battle-selesai to players:', hasilBattle);
       io.to(battleId).emit('battle-selesai', hasilBattle);
       
       // Hapus battle dari memory
