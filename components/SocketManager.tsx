@@ -160,10 +160,11 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
 
   const submitAnswer = (battleId: string, answer: string) => {
     if (socketRef.current) {
-      socketRef.current.emit('jawab-pertanyaan', {
+      console.log(`📝 Submitting answer: ${answer} for battle: ${battleId}`);
+      socketRef.current.emit('jawab-battle', {
         battleId,
         jawaban: answer,
-        waktuJawab: Date.now()
+        pemainId: user.pemainId
       });
     }
   };

@@ -104,14 +104,39 @@ export default function DashboardPage() {
     }
   };
 
-  const handleBattleEnd = (result: BattleResult) => {
-    setBattleResult(result);
+  const handleBattleEnd = (result: any) => {
+    // Tentukan pesan berdasarkan hasil
+    let pesan = '';
+    let menang = false;
+    
+    if (result.pemenang === user?.pemainId) {
+      if (result.pesan.includes('benar')) {
+        menang = true;
+        pesan = '🎉 LANJUTKAN PERJALANAN!';
+      } else {
+        menang = false;
+        pesan = '💔 ULANGI DARI AWAL!';
+      }
+    } else {
+      if (result.pesan.includes('benar')) {
+        menang = false;
+        pesan = '💔 ULANGI DARI AWAL!';
+      } else {
+        menang = true;
+        pesan = '🎉 LANJUTKAN PERJALANAN!';
+      }
+    }
+    
+    setBattleResult({
+      menang,
+      pesan
+    });
     setActiveBattle(null);
     
-    // Clear result after 3 seconds
+    // Auto-hide result after 5 seconds
     setTimeout(() => {
       setBattleResult(null);
-    }, 3000);
+    }, 5000);
   };
 
   const handleNearbyPlayers = (players: any[]) => {
