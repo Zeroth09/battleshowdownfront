@@ -400,6 +400,35 @@ io.on('connection', (socket) => {
       console.log(`🔴 Socket terputus tanpa data pemain: ${socket.id}`);
     }
   });
+
+  // Game Master Events
+  socket.on('game-master-trigger-battle', (data) => {
+    const { battleData, gameMasterId } = data;
+    console.log(`👑 Game Master ${gameMasterId} triggered global battle`);
+    
+    // Broadcast battle to all connected players
+    io.emit('global-battle-start', {
+      battleData,
+      gameMasterId,
+      timestamp: Date.now()
+    });
+    
+    console.log(`📡 Global battle broadcasted to ${io.engine.clientsCount} players`);
+  });
+
+  socket.on('game-master-end-battle', (data) => {
+    const { result, gameMasterId } = data;
+    console.log(`👑 Game Master ${gameMasterId} ended global battle`);
+    
+    // Broadcast battle end to all connected players
+    io.emit('global-battle-end', {
+      result,
+      gameMasterId,
+      timestamp: Date.now()
+    });
+    
+    console.log(`📡 Global battle end broadcasted to ${io.engine.clientsCount} players`);
+  });
 });
 
 // Fungsi untuk cek jarak antar pemain

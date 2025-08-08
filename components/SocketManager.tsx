@@ -142,6 +142,17 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
       }
     });
 
+    // Listen for global battle events (Game Master)
+    socket.on('global-battle-start', (data) => {
+      console.log('👑 Global battle started:', data);
+      onBattleStart(data.battleData);
+    });
+
+    socket.on('global-battle-end', (data) => {
+      console.log('👑 Global battle ended:', data);
+      onBattleEnd(data.result);
+    });
+
     // Debug: log all emitted events
     const originalEmit = socket.emit;
     socket.emit = function(event, ...args) {
