@@ -113,6 +113,7 @@ app.get('/debug/pemain', async (req, res) => {
 const pemainAktif = new Map(); // socketId -> data pemain (in-memory cache)
 const pertempuranAktif = new Map(); // battleId -> data pertempuran
 const battleLocks = new Set(); // Mencegah multiple battle triggers
+const locationUpdateTimers = new Map(); // Debounce untuk update location ke Google Sheets
 
 io.on('connection', (socket) => {
   console.log('🟢 Pemain terhubung:', socket.id);
@@ -132,9 +133,16 @@ io.on('connection', (socket) => {
       }
     };
     
-    // Simpan ke memory cache dan Google Sheets
+    // Simpan ke memory cache
     pemainAktif.set(socket.id, playerData);
-    await googleSheetsService.updatePlayerLocation(socket.id, playerData);
+    
+    // Update ke Google Sheets dengan error handling
+    try {
+      await googleSheetsService.updatePlayerLocation(socket.id, playerData);
+      console.log(`📊 Added ${nama} to Google Sheets`);
+    } catch (error) {
+      console.error(`❌ Error adding ${nama} to Google Sheets:`, error.message);
+    }
     
     socket.join(tim); // Join room berdasarkan tim
     socket.emit('bergabung-berhasil', { tim, pemainId });
@@ -155,8 +163,19 @@ io.on('connection', (socket) => {
       
       console.log(`📍 Update lokasi ${pemain.nama} (${pemain.tim}): ${lokasi.latitude}, ${lokasi.longitude}`);
       
-      // Update ke Google Sheets
-      await googleSheetsService.updatePlayerLocation(socket.id, pemain);
+      // Debounce update ke Google Sheets (hanya update setiap 30 detik)
+      if (locationUpdateTimers.has(socket.id)) {
+        clearTimeout(locationUpdateTimers.get(socket.id));
+      }
+      
+      locationUpdateTimers.set(socket.id, setTimeout(async () => {
+        try {
+          await googleSheetsService.updatePlayerLocation(socket.id, pemain);
+          console.log(`📊 Updated ${pemain.nama} location to Google Sheets`);
+        } catch (error) {
+          console.error(`❌ Error updating ${pemain.nama} location to Google Sheets:`, error.message);
+        }
+      }, 30000)); // 30 detik debounce
       
       // Cek apakah ada pemain lawan dalam jarak 2 meter
       cekJarakPemain(socket.id, pemain);
