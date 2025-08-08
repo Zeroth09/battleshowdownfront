@@ -191,6 +191,14 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
     }
   };
 
+  // Expose socket directly for fallback
+  useEffect(() => {
+    if (socketRef.current && typeof window !== 'undefined') {
+      (window as any).socket = socketRef.current;
+      console.log('✅ Socket exposed to window for fallback');
+    }
+  }, [socketRef.current]);
+
   // Expose submitAnswer function untuk digunakan di parent component
   useImperativeHandle(ref, () => ({
     submitAnswer
