@@ -226,6 +226,17 @@ export default function DashboardPage() {
       console.error('❌ socketManagerInstance:', socketManagerInstance);
       console.error('❌ socketManagerReady:', socketManagerReady);
       
+      // Wait a bit and try again
+      setTimeout(() => {
+        console.log('🔄 Retrying submitAnswer after delay...');
+        if (socketManagerRef.current?.submitAnswer) {
+          console.log('🎯 Found submitAnswer in retry');
+          socketManagerRef.current.submitAnswer(battleData.id, answer);
+        } else {
+          console.error('❌ Still no submitAnswer available after retry');
+        }
+      }, 1000);
+      
       // Fallback: try to emit directly if we have socket
       console.log('🔄 Trying fallback method...');
       if (typeof window !== 'undefined' && (window as any).socket) {

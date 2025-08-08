@@ -118,6 +118,14 @@ const locationUpdateTimers = new Map(); // Debounce untuk update location ke Goo
 io.on('connection', (socket) => {
   console.log('🟢 Pemain terhubung:', socket.id);
   console.log('📊 Total pemain aktif:', pemainAktif.size);
+  
+  // Debug: log all events
+  socket.onAny((eventName, ...args) => {
+    console.log(`📡 Socket ${socket.id} event: ${eventName}`, args);
+  });
+  
+  // Debug: log connection details
+  console.log(`🔗 Socket ${socket.id} connected with events:`, socket.eventNames());
 
   // Pemain bergabung dengan tim
   socket.on('bergabung-tim', async (data) => {
@@ -185,20 +193,34 @@ io.on('connection', (socket) => {
   // Handle jawaban battle
   socket.on('jawab-battle', (data) => {
     console.log('📝 Received jawab-battle event:', data);
+    console.log('📝 Socket ID:', socket.id);
+    console.log('📝 All active battles:', Array.from(pertempuranAktif.keys()));
+    console.log('📝 Total connected sockets:', io.engine.clientsCount);
+    console.log('📝 All socket IDs:', Array.from(io.sockets.sockets.keys()));
+    
     const { battleId, jawaban, pemainId } = data;
     const battle = pertempuranAktif.get(battleId);
     
     console.log('📝 Battle found:', battle ? 'yes' : 'no');
     console.log('📝 Battle selesai:', battle?.selesai);
     console.log('📝 Total battles active:', pertempuranAktif.size);
+    console.log('📝 Active battle IDs:', Array.from(pertempuranAktif.keys()));
     
     if (!battle || battle.selesai) {
       console.log('❌ Battle not found or already finished');
+      console.log('❌ Available battle IDs:', Array.from(pertempuranAktif.keys()));
       return;
     }
 
     console.log(`📝 ${pemainId} menjawab: ${jawaban} untuk battle ${battleId}`);
     console.log(`📝 Current answers in battle:`, battle.jawaban);
+
+    // Cek apakah pemain sudah jawab sebelumnya
+    const sudahJawab = battle.jawaban.find(j => j.pemainId === pemainId);
+    if (sudahJawab) {
+      console.log(`⚠️ Pemain ${pemainId} sudah jawab sebelumnya, skip`);
+      return;
+    }
 
     // Tambah jawaban ke battle
     battle.jawaban.push({
@@ -208,6 +230,7 @@ io.on('connection', (socket) => {
     });
 
     console.log(`📝 Total answers now: ${battle.jawaban.length}`);
+    console.log(`📝 Answers from players:`, battle.jawaban.map(j => `${j.pemainId}: ${j.jawaban}`));
 
     // Cek apakah ini jawaban pertama
     if (battle.jawaban.length === 1) {
@@ -342,11 +365,11 @@ function cekJarakPemain(socketId, pemain) {
         // Set lock untuk mencegah multiple triggers
         battleLocks.add(lockKey);
         
-        // Clear lock setelah 5 detik
-        setTimeout(() => {
-          battleLocks.delete(lockKey);
-        }, 5000);
-        
+              // Clear lock setelah 5 detik
+      setTimeout(() => {
+        battleLocks.delete(lockKey);
+      }, 5000);
+      
         triggerBattle(socketId, idLawan, pemain, dataLawan);
       } else {
         console.log(`⏸️ Battle sudah aktif atau locked untuk ${pemain.nama}, skip trigger`);

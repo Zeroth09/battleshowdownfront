@@ -147,8 +147,9 @@ const SocketManager = React.forwardRef<{ submitAnswer: (battleId: string, answer
     // Call onReady when component is ready
     if (onReady) {
       setTimeout(() => {
+        console.log('🎯 SocketManager calling onReady...');
         onReady();
-      }, 1000); // Give some time for socket to connect
+      }, 2000); // Give more time for socket to connect
     }
 
     return () => {
