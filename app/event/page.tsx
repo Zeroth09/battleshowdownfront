@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sword, Users, Target, Zap, Clock, Crown } from 'lucide-react';
+import { Sword, Users, Target, Zap, Clock, Crown, Radio } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const SocketManager = dynamic(() => import('../../components/SocketManager'), {
@@ -52,6 +52,7 @@ export default function EventPage() {
   const [nearbyPlayers, setNearbyPlayers] = useState<any[]>([]);
   const [battleStatus, setBattleStatus] = useState<string>('Menunggu Game Master');
   const [isGameMaster, setIsGameMaster] = useState(false);
+  const [lobbyPlayers, setLobbyPlayers] = useState<any[]>([]);
 
   const socketManagerRef = useRef<any>(null);
 
@@ -152,6 +153,10 @@ export default function EventPage() {
 
   const handleNearbyPlayers = (players: any[]) => {
     setNearbyPlayers(players);
+    // Update lobby players for game master
+    if (isGameMaster) {
+      setLobbyPlayers(players);
+    }
   };
 
   const handleBattleCancelled = () => {
@@ -176,16 +181,16 @@ export default function EventPage() {
     }, 3000);
   };
 
-  const triggerManualBattle = async () => {
+  const triggerBattleForAll = async () => {
     if (!user || !isGameMaster) return;
     
-    setBattleStatus('Mencari Lawan...');
+    setBattleStatus('Memulai Battle untuk Semua Peserta...');
     
     try {
-      // Simulate finding opponent
+      // Simulate battle for all participants
       setTimeout(() => {
         const mockBattle: Battle = {
-          id: `manual_${Date.now()}`,
+          id: `global_${Date.now()}`,
           pertanyaan: 'Apa ibukota Indonesia?',
           pilihanJawaban: {
             a: 'Jakarta',
@@ -195,16 +200,25 @@ export default function EventPage() {
           },
           jawabanBenar: 'Jakarta',
           lawan: {
-            nama: 'Lawan Manual',
-            tim: user.tim === 'merah' ? 'putih' : 'merah'
+            nama: 'Tim Lawan',
+            tim: 'lawan'
           }
         };
         
-        handleBattleStart(mockBattle);
+        // Emit global battle event to all participants
+        if (socketManagerRef.current?.socket && user) {
+          socketManagerRef.current.socket.emit('game-master-trigger-battle', {
+            battleData: mockBattle,
+            gameMasterId: user.pemainId
+          });
+          console.log('🎯 Game Master triggered global battle');
+        }
+        
+        setBattleStatus('Battle Dimulai untuk Semua Peserta!');
       }, 2000);
       
     } catch (error) {
-      console.error('❌ Error triggering manual battle:', error);
+      console.error('❌ Error triggering global battle:', error);
       setError('Error triggering battle');
       setBattleStatus('Menunggu Game Master');
     }
@@ -215,6 +229,15 @@ export default function EventPage() {
       menang,
       pesan: menang ? 'LANJUTKAN PERJALANAN!' : 'ULANGI DARI AWAL!'
     };
+    
+    // Emit global battle end to all participants
+    if (socketManagerRef.current?.socket && user) {
+      socketManagerRef.current.socket.emit('game-master-end-battle', {
+        result,
+        gameMasterId: user.pemainId
+      });
+      console.log('🎯 Game Master ended global battle');
+    }
     
     handleBattleEnd(result);
   };
@@ -330,18 +353,45 @@ export default function EventPage() {
               </div>
               <h3 className="text-xl font-bold mb-2">Game Master Controls</h3>
               <p className="text-gray-300 mb-6">
-                Klik tombol di bawah untuk memulai pertempuran
+                Klik tombol di bawah untuk memulai pertempuran untuk semua peserta
               </p>
               
               <button
-                onClick={triggerManualBattle}
+                onClick={triggerBattleForAll}
                 className="w-full py-4 px-8 rounded-xl font-bold text-lg transition-all duration-200 transform bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 hover:scale-105 active:scale-95"
               >
                 <div className="flex items-center justify-center gap-2">
-                  <Sword className="w-5 h-5" />
-                  <span>⚔️ TRIGGER BATTLE</span>
+                  <Radio className="w-5 h-5" />
+                  <span>🎯 TRIGGER BATTLE UNTUK SEMUA</span>
                 </div>
               </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Lobby Players (Game Master Only) */}
+        {isGameMaster && lobbyPlayers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-white/20"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <Users className="w-6 h-6 text-blue-400" />
+              <h3 className="text-lg font-bold">Peserta di Lobby</h3>
+            </div>
+            
+            <div className="space-y-3">
+              {lobbyPlayers.map((player, index) => (
+                <div key={index} className="flex items-center gap-3 p-3 bg-white/10 rounded-lg">
+                  <div className={`w-4 h-4 rounded-full ${player.tim === 'merah' ? 'bg-red-500' : 'bg-white'}`}></div>
+                  <div className="flex-1">
+                    <p className="font-bold">{player.nama}</p>
+                    <p className="text-sm text-gray-300">Tim {player.tim.toUpperCase()}</p>
+                  </div>
+                  <div className="text-green-400 text-sm">✓ Online</div>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}
