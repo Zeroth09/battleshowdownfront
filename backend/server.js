@@ -4,11 +4,19 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
+const path = require('path');
 
 // Import routes
 const pertanyaanSheetsRoutes = require('./routes/pertanyaan-sheets');
 
-dotenv.config({ path: './env.local' });
+// Load environment variables from env.local
+dotenv.config({ path: path.join(__dirname, 'env.local') });
+
+// Log environment variables for debugging
+console.log('🔧 Environment variables loaded:');
+console.log('GOOGLE_SHEET_ID:', process.env.GOOGLE_SHEET_ID ? '✅ Set' : '❌ Not set');
+console.log('GOOGLE_SERVICE_ACCOUNT_EMAIL:', process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? '✅ Set' : '❌ Not set');
+console.log('GOOGLE_PRIVATE_KEY:', process.env.GOOGLE_PRIVATE_KEY ? '✅ Set' : '❌ Not set');
 
 const app = express();
 const server = http.createServer(app);
