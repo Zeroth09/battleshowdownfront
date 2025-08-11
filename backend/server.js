@@ -8,7 +8,7 @@ const { GoogleSpreadsheet } = require('google-spreadsheet');
 // Import routes
 const pertanyaanSheetsRoutes = require('./routes/pertanyaan-sheets');
 
-dotenv.config();
+dotenv.config({ path: './env.local' });
 
 const app = express();
 const server = http.createServer(app);
@@ -20,11 +20,17 @@ const io = socketIo(server, {
 });
 
 // Google Sheets setup
-const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID);
-let questionsSheet, playersSheet;
+let doc, questionsSheet, playersSheet;
 
 async function initializeGoogleSheets() {
+  // Skip Google Sheets if environment variables not set
+  if (!process.env.GOOGLE_SHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+    console.log('⚠️ Google Sheets environment variables not set, skipping initialization');
+    return;
+  }
+
   try {
+    doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEET_ID);
     await doc.useServiceAccountAuth({
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n')
@@ -73,8 +79,18 @@ function hitungJarak(lat1, lon1, lat2, lon2) {
 async function ambilPertanyaanRandom() {
   try {
     if (!questionsSheet) {
-      console.error('❌ Questions sheet not initialized');
-      return null;
+      console.log('⚠️ Questions sheet not available, returning sample question');
+      // Return sample question for development
+      return {
+        pertanyaan: "Ibu kota Indonesia adalah?",
+        pilihanJawaban: {
+          a: "Jakarta",
+          b: "Bandung", 
+          c: "Surabaya",
+          d: "Yogyakarta"
+        },
+        jawabanBenar: "a"
+      };
     }
 
     const rows = await questionsSheet.getRows();
@@ -106,7 +122,7 @@ async function ambilPertanyaanRandom() {
 async function tambahPemainKeSheet(pemain) {
   try {
     if (!playersSheet) {
-      console.error('❌ Players sheet not initialized');
+      console.log('⚠️ Players sheet not available, skipping Google Sheets update');
       return;
     }
 
@@ -143,6 +159,8 @@ function debounceLocationUpdate(pemainId, location) {
           playerRow.set('waktu_update', new Date().toISOString());
           await playerRow.save();
         }
+      } else {
+        console.log('⚠️ Players sheet not available, skipping location update');
       }
     } catch (error) {
       console.error('❌ Error updating player location:', error);
