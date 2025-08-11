@@ -96,6 +96,32 @@ export default function LobbyPage() {
     // Update real-time player answers
   };
 
+  // Handle lobby update events
+  const handleLobbyUpdate = (data: any) => {
+    console.log('👥 Lobby updated:', data);
+    if (data.players && Array.isArray(data.players)) {
+      // Filter out current player from the list
+      const otherPlayers = data.players.filter(
+        (pemain: PemainData) => pemain.pemainId !== pemainData?.pemainId
+      );
+      setPemainLain(otherPlayers);
+      console.log('✅ Updated pemain lain:', otherPlayers);
+    }
+  };
+
+  // Listen for lobby updates
+  useEffect(() => {
+    if (socketRef.current?.socket) {
+      const socket = socketRef.current.socket;
+      
+      socket.on('lobby-update', handleLobbyUpdate);
+      
+      return () => {
+        socket.off('lobby-update', handleLobbyUpdate);
+      };
+    }
+  }, [socketRef.current?.socket, pemainData?.pemainId]);
+
   const handleJawab = async (jawaban: string) => {
     if (!socketRef.current || !pertanyaan) return;
     
@@ -337,24 +363,33 @@ export default function LobbyPage() {
                   <span className="text-xs text-gray-500">(Kamu)</span>
                 </div>
 
-                {/* Pemain lain akan diupdate via WebSocket */}
-                {pemainLain.map((pemain, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl"
-                  >
-                    <div className={`w-3 h-3 rounded-full ${pemain.tim === 'merah' ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-                    <span className="font-medium text-gray-900">{pemain.nama}</span>
-                  </motion.div>
-                ))}
+                {/* Pemain lain yang terhubung real-time */}
+                <AnimatePresence>
+                  {pemainLain.map((pemain, index) => (
+                    <motion.div
+                      key={pemain.pemainId}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-center space-x-3 p-3 bg-gray-50 rounded-xl"
+                    >
+                      <div className={`w-3 h-3 rounded-full ${pemain.tim === 'merah' ? 'bg-red-500' : 'bg-gray-400'}`}></div>
+                      <span className="font-medium text-gray-900">{pemain.nama}</span>
+                      <span className="text-xs text-gray-500">({pemain.tim})</span>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
 
                 {pemainLain.length === 0 && (
-                  <div className="text-center py-4 text-gray-500">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-4 text-gray-500"
+                  >
                     <p>Belum ada pemain lain</p>
-                  </div>
+                    <p className="text-xs mt-1">Menunggu pemain lain bergabung...</p>
+                  </motion.div>
                 )}
               </div>
 
@@ -369,6 +404,22 @@ export default function LobbyPage() {
                   {status === 'pertanyaan' && 'Sedang menjawab pertanyaan'}
                   {status === 'hasil' && 'Menampilkan hasil'}
                 </div>
+              </div>
+
+              {/* Connection Info */}
+              <div className="mt-4 p-3 bg-blue-50 rounded-xl">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-sm font-medium text-blue-700">
+                    {isConnected ? 'Socket Terhubung' : 'Socket Terputus'}
+                  </span>
+                </div>
+                <p className="text-xs text-blue-600">
+                  {isConnected 
+                    ? 'Siap menerima update real-time'
+                    : 'Mencoba menghubungkan...'
+                  }
+                </p>
               </div>
             </div>
           </div>
