@@ -12,6 +12,8 @@ Game battle showdown yang super simple dan fun! Pemain bisa langsung main tanpa 
 - **🔌 WebSocket Integration** - Real-time communication antara pemain dan Game Master
 - **📱 Responsive Design** - Bisa dimainkan di desktop, tablet, dan mobile
 - **🎮 Admin Panel** - Kontrol game dari dashboard admin yang powerful
+- **📍 GPS Detection** - Deteksi jarak antar pemain dengan akurasi 1 meter
+- **⚔️ Auto Battle** - Pertempuran otomatis ketika pemain lawan bertemu
 
 ## 🎯 Cara Main
 
@@ -48,6 +50,7 @@ Game battle showdown yang super simple dan fun! Pemain bisa langsung main tanpa 
 - Node.js 18+ 
 - npm atau yarn
 - Git
+- MongoDB (local atau cloud)
 
 ### Installation
 
@@ -101,6 +104,7 @@ npm run lint         # Lint code
 npm start            # Jalankan production server
 npm run dev          # Jalankan dengan nodemon (development)
 npm test             # Run backend tests
+npm run seed         # Seed data pertanyaan
 ```
 
 ## 🏗️ Struktur Project
@@ -122,7 +126,9 @@ instant battle games/
 │   ├── dashboard/         # User dashboard
 │   │   └── page.tsx       # Dashboard pemain
 │   ├── event/             # Event management
-│   └── lomba/             # Tournament system
+│   ├── lomba/             # Tournament system
+│   └── api/               # API routes
+│       └── pertanyaan/     # Question management API
 ├── components/             # React components
 │   ├── ErrorBoundary.tsx  # Error handling component
 │   ├── MapComponent.tsx   # Game map component
@@ -137,12 +143,14 @@ instant battle games/
 │   │   ├── auth.js        # Authentication routes
 │   │   ├── battle.js      # Game battle routes
 │   │   ├── pemain.js      # Player management
-│   │   └── pertanyaan.js  # Question management
+│   │   ├── pertanyaan.js  # Question management
+│   │   └── pertanyaan-sheets.js # Google Sheets integration
 │   ├── services/          # Business logic
 │   │   └── googleSheets.js # Google Sheets integration
 │   └── scripts/           # Utility scripts
 │       ├── seed-pertanyaan.js # Seed questions
-│       └── seed-sheets.js     # Google Sheets setup
+│       ├── seed-sheets.js     # Google Sheets setup
+│       └── import-from-sheets.js # Import from Google Sheets
 ├── public/                 # Static assets
 │   ├── icon-192x192.png   # PWA icon
 │   ├── icon-512x512.png   # PWA icon
@@ -178,6 +186,7 @@ instant battle games/
 - **Authentication**: JWT
 - **File Upload**: Multer
 - **Validation**: Joi
+- **Google Sheets**: googleapis, google-spreadsheet
 
 ### Development Tools
 - **Package Manager**: npm
@@ -203,6 +212,7 @@ MONGODB_URI=mongodb://localhost:27017/battle-showdown
 JWT_SECRET=your-secret-key
 GOOGLE_SHEETS_CREDENTIALS=path/to/credentials.json
 GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
+FRONTEND_URL=http://localhost:3000
 ```
 
 ## 🎨 Design System
@@ -307,6 +317,20 @@ npm run test:coverage     # Run tests with coverage
 - `PUT /api/pertanyaan/:id` - Update question
 - `DELETE /api/pertanyaan/:id` - Delete question
 
+## 🔄 Socket.IO Events
+
+### Client ke Server
+- `bergabung-tim` - Pemain bergabung dengan tim
+- `update-lokasi` - Update lokasi pemain
+- `jawab-pertanyaan` - Jawaban pertanyaan battle
+
+### Server ke Client
+- `bergabung-berhasil` - Konfirmasi bergabung tim
+- `pemain-baru` - Notifikasi pemain baru bergabung
+- `battle-dimulai` - Notifikasi battle dimulai
+- `battle-selesai` - Hasil battle
+- `pemain-keluar` - Notifikasi pemain keluar
+
 ## 🚧 Roadmap
 
 ### Phase 1 (Current)
@@ -314,6 +338,8 @@ npm run test:coverage     # Run tests with coverage
 - [x] WebSocket integration
 - [x] Admin panel
 - [x] PWA support
+- [x] GPS detection system
+- [x] Google Sheets integration
 
 ### Phase 2 (Next)
 - [ ] Advanced scoring system
@@ -376,4 +402,4 @@ Dibuat dengan ❤️ untuk game battle yang seru dan simple!
 
 **Happy Gaming! 🎮✨**
 
-*Jangan lupa kasih ⭐ jika project ini bermanfaat!* 
+*Jangan lupa kasih ⭐ jika project ini bermanfaat!*

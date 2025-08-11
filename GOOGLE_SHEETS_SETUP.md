@@ -171,4 +171,107 @@ Jika ada masalah atau pertanyaan:
 1. Periksa logs backend
 2. Test koneksi Google Sheets
 3. Verifikasi environment variables
-4. Check Google Cloud Console untuk quota dan permissions 
+4. Check Google Cloud Console untuk quota dan permissions
+
+## 🚂 Deployment ke Railway
+
+### Set Environment Variables di Railway
+1. **Buka** [Railway Dashboard](https://railway.app)
+2. **Login** dan pilih project backend
+3. **Klik** tab "Variables"
+4. **Add 3 environment variables**:
+
+#### Variable 1: GOOGLE_SHEET_ID
+```
+Name: GOOGLE_SHEET_ID
+Value: [SPREADSHEET_ID_ANDA]
+```
+
+#### Variable 2: GOOGLE_SERVICE_ACCOUNT_EMAIL
+```
+Name: GOOGLE_SERVICE_ACCOUNT_EMAIL
+Value: [SERVICE_ACCOUNT_EMAIL]
+```
+
+#### Variable 3: GOOGLE_PRIVATE_KEY
+```
+Name: GOOGLE_PRIVATE_KEY
+Value: -----BEGIN PRIVATE KEY-----
+[PRIVATE_KEY_CONTENT]
+-----END PRIVATE KEY-----
+```
+
+**⚠️ PENTING untuk GOOGLE_PRIVATE_KEY:**
+- Copy seluruh private key termasuk header dan footer
+- Jangan ubah format `\n` dalam string
+- Pastikan tidak ada spasi extra di awal/akhir
+
+## 🧪 Test Setup
+
+Setelah set environment variables:
+
+1. **Railway akan auto-deploy** backend dengan config baru
+2. **Test endpoint**:
+   ```bash
+   curl https://[RAILWAY_URL]/health
+   ```
+3. **Check logs** di Railway dashboard untuk connection status
+
+## 📊 Seed Initial Data
+
+Setelah backend running:
+
+1. **Railway console**, run:
+   ```bash
+   npm run seed-sheets
+   ```
+2. **Check spreadsheet** - akan muncul 2 sheets:
+   - `Questions`: Berisi sample pertanyaan
+   - `Players`: Berisi data pemain aktif
+
+## ✅ Verification Checklist
+
+- [ ] Google Cloud project created
+- [ ] Google Sheets API enabled
+- [ ] Service account created
+- [ ] JSON key downloaded
+- [ ] Spreadsheet shared dengan service account
+- [ ] Environment variables set di Railway
+- [ ] Backend deployed successfully
+- [ ] Spreadsheet memiliki 2 sheets (Questions & Players)
+- [ ] Questions sheet berisi sample data
+- [ ] Health check endpoint responding
+
+## 🔍 Troubleshooting Lanjutan
+
+### Error: "Unable to parse key"
+- Check GOOGLE_PRIVATE_KEY format
+- Pastikan include -----BEGIN dan -----END lines
+- Pastikan tidak ada extra spaces
+
+### Error: "Insufficient Permission" 
+- Pastikan spreadsheet di-share dengan service account email
+- Check permission level adalah "Editor"
+
+### Error: "Spreadsheet not found"
+- Verify GOOGLE_SHEET_ID benar
+- Check spreadsheet visibility (tidak private)
+
+### Error: "API not enabled"
+- Enable Google Sheets API di Google Cloud Console
+- Tunggu beberapa menit untuk propagation
+
+## 📱 Next Steps
+
+Setelah setup selesai:
+1. Test multiplayer di HP dan tablet
+2. Check data tersimpan di Google Sheets
+3. Monitor players activity di sheets
+4. Add more questions sesuai kebutuhan
+
+## 💡 Tips
+
+1. **Backup JSON key** - simpan di tempat aman
+2. **Monitor quota** - Google Sheets ada limit API calls
+3. **Regular cleanup** - hapus old player data
+4. **Add more questions** - edit langsung di spreadsheet
