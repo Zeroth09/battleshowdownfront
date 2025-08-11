@@ -4,9 +4,7 @@ const router = express.Router();
 // Get semua pertanyaan dari Google Sheets
 router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 20, kategori, tingkatKesulitan } = req.query;
-    
-    console.log('⚠️ Google Sheets not configured, returning sample data');
+    console.log('✅ Endpoint pertanyaan/sheets dipanggil');
     
     // Return sample data for development
     const samplePertanyaan = [
@@ -57,32 +55,20 @@ router.get('/', async (req, res) => {
       }
     ];
 
-    // Filter berdasarkan kategori dan tingkat kesulitan
-    let filteredPertanyaan = samplePertanyaan;
-    if (kategori && kategori !== 'semua') {
-      filteredPertanyaan = filteredPertanyaan.filter(q => q.kategori === kategori);
-    }
-    if (tingkatKesulitan && tingkatKesulitan !== 'semua') {
-      filteredPertanyaan = filteredPertanyaan.filter(q => q.tingkatKesulitan === tingkatKesulitan);
-    }
-
-    // Pagination
-    const startIndex = (parseInt(page) - 1) * parseInt(limit);
-    const endIndex = startIndex + parseInt(limit);
-    const paginatedPertanyaan = filteredPertanyaan.slice(startIndex, endIndex);
-
+    console.log('✅ Mengirim sample data:', samplePertanyaan.length, 'pertanyaan');
+    
     return res.json({
       sukses: true,
-      data: paginatedPertanyaan,
+      data: samplePertanyaan,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: filteredPertanyaan.length,
-        pages: Math.ceil(filteredPertanyaan.length / parseInt(limit))
+        page: 1,
+        limit: 20,
+        total: samplePertanyaan.length,
+        pages: 1
       }
     });
   } catch (error) {
-    console.error('Error get pertanyaan from sheets:', error);
+    console.error('❌ Error get pertanyaan:', error);
     res.status(500).json({ 
       sukses: false, 
       pesan: 'Terjadi kesalahan server!' 
@@ -93,22 +79,11 @@ router.get('/', async (req, res) => {
 // POST - Tambah pertanyaan baru ke Google Sheets
 router.post('/', async (req, res) => {
   try {
-    const { pertanyaan, pilihanJawaban, jawabanBenar, kategori, tingkatKesulitan } = req.body;
-    
-    // Validasi input
-    if (!pertanyaan || !pilihanJawaban || !jawabanBenar || !kategori || !tingkatKesulitan) {
-      return res.status(400).json({
-        sukses: false,
-        pesan: 'Semua field harus diisi!'
-      });
-    }
-    
     console.log('⚠️ Google Sheets not configured, cannot add question');
     return res.status(500).json({ 
       sukses: false, 
       pesan: 'Google Sheets tidak tersedia untuk development!' 
     });
-    
   } catch (error) {
     console.error('Error adding pertanyaan to sheets:', error);
     res.status(500).json({ 
@@ -122,9 +97,7 @@ router.post('/', async (req, res) => {
 router.get('/kategori/:kategori', async (req, res) => {
   try {
     const { kategori } = req.params;
-    const { limit = 10 } = req.query;
-    
-    console.log('⚠️ Google Sheets not configured, returning sample data');
+    console.log('✅ Endpoint kategori dipanggil untuk:', kategori);
     
     // Return sample data for development
     const samplePertanyaan = [
@@ -145,7 +118,7 @@ router.get('/kategori/:kategori', async (req, res) => {
       }
     ];
 
-    const filteredPertanyaan = samplePertanyaan.filter(q => q.kategori === kategori).slice(0, parseInt(limit));
+    const filteredPertanyaan = samplePertanyaan.filter(q => q.kategori === kategori);
     
     return res.json({
       sukses: true,
@@ -163,7 +136,7 @@ router.get('/kategori/:kategori', async (req, res) => {
 // Get pertanyaan random dari Google Sheets
 router.get('/random', async (req, res) => {
   try {
-    console.log('⚠️ Google Sheets not configured, returning sample question');
+    console.log('✅ Endpoint random dipanggil');
     
     // Return sample question for development
     const sampleQuestion = {
@@ -198,7 +171,7 @@ router.get('/random', async (req, res) => {
 // Get statistik pertanyaan dari Google Sheets
 router.get('/statistik', async (req, res) => {
   try {
-    console.log('⚠️ Google Sheets not configured, returning sample stats');
+    console.log('✅ Endpoint statistik dipanggil');
     
     // Return sample stats for development
     const sampleStats = {
