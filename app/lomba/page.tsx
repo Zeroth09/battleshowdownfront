@@ -1,9 +1,20 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Clock, Trophy, X, CheckCircle, XCircle } from 'lucide-react';
-import SocketManager from '../../components/SocketManager';
+import dynamic from 'next/dynamic';
+import ErrorBoundary from '../../components/ErrorBoundary';
+
+// Dynamic import SocketManager dengan error handling
+const SocketManager = dynamic(() => import('../../components/SocketManager'), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg">
+      Menghubungkan ke server...
+    </div>
+  )
+});
 
 interface User {
   pemainId: string;
@@ -31,7 +42,7 @@ interface Battle {
   };
 }
 
-const LombaPage = () => {
+const LombaPageContent = () => {
   const [user, setUser] = useState<User | null>(null);
   const [activeBattle, setActiveBattle] = useState<Battle | null>(null);
   const [battleStatus, setBattleStatus] = useState<string>('Menunggu Pertanyaan');
@@ -42,77 +53,105 @@ const LombaPage = () => {
   const [showResult, setShowResult] = useState<boolean>(false);
   const [resultMessage, setResultMessage] = useState<string>('');
   const [resultType, setResultType] = useState<'win' | 'lose' | ''>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
   const socketManagerRef = useRef<any>(null);
   const [socketManagerReady, setSocketManagerReady] = useState<boolean>(false);
   const [socketManagerInstance, setSocketManagerInstance] = useState<any>(null);
 
-  // Load user data from localStorage
+  // Load user data from localStorage with error handling
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    } else {
-      // Create default user if none exists
-      const defaultUser: User = {
+    try {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+      } else {
+        // Create default user if none exists
+        const defaultUser: User = {
+          pemainId: `player_${Date.now()}`,
+          nama: `Peserta ${Math.floor(Math.random() * 1000)}`,
+          tim: Math.random() > 0.5 ? 'merah' : 'putih'
+        };
+        setUser(defaultUser);
+        localStorage.setItem('user', JSON.stringify(defaultUser));
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+      // Fallback user
+      const fallbackUser: User = {
         pemainId: `player_${Date.now()}`,
-        nama: `Peserta ${Math.floor(Math.random() * 1000)}`,
-        tim: Math.random() > 0.5 ? 'merah' : 'putih'
+        nama: 'Peserta',
+        tim: 'merah'
       };
-      setUser(defaultUser);
-      localStorage.setItem('user', JSON.stringify(defaultUser));
+      setUser(fallbackUser);
+      localStorage.setItem('user', JSON.stringify(fallbackUser));
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
-  const handleBattleStart = (battleData: Battle) => {
-    console.log('🎯 Battle started for participant:', battleData);
-    setActiveBattle(battleData);
-    setBattleStatus('Pertanyaan Aktif!');
-    setSelectedAnswer('');
-    setIsAnswering(false);
-    setShowResult(false);
-    setResultMessage('');
-    setResultType('');
-  };
-
-  const handleBattleEnd = (result: any) => {
-    console.log('🏁 Battle ended for participant:', result);
-    
-    if (result && result.pemenang) {
-      const isWinner = result.pemenang.pemainId === user?.pemainId;
-      const isCorrect = result.jawabanBenar === result.jawabanPeserta;
-      
-      if (isWinner && isCorrect) {
-        setResultMessage('🏆 LANJUTKAN PERJALANAN!');
-        setResultType('win');
-      } else if (isWinner && !isCorrect) {
-        setResultMessage('💔 ULANGI DARI AWAL!');
-        setResultType('lose');
-      } else {
-        setResultMessage('💔 ULANGI DARI AWAL!');
-        setResultType('lose');
-      }
-    }
-    
-    setShowResult(true);
-    setBattleStatus('Menunggu Pertanyaan');
-    
-    // Auto clear after 5 seconds
-    setTimeout(() => {
-      setActiveBattle(null);
+  const handleBattleStart = useCallback((battleData: Battle) => {
+    try {
+      console.log('🎯 Battle started for participant:', battleData);
+      setActiveBattle(battleData);
+      setBattleStatus('Pertanyaan Aktif!');
+      setSelectedAnswer('');
+      setIsAnswering(false);
       setShowResult(false);
       setResultMessage('');
       setResultType('');
-    }, 5000);
-  };
+      setError(''); // Clear any previous errors
+    } catch (error) {
+      console.error('Error in handleBattleStart:', error);
+      setError('Error memulai battle');
+    }
+  }, []);
 
-  const handleSubmitAnswer = async (answer: string) => {
+  const handleBattleEnd = useCallback((result: any) => {
+    try {
+      console.log('🏁 Battle ended for participant:', result);
+      
+      if (result && result.pemenang) {
+        const isWinner = result.pemenang.pemainId === user?.pemainId;
+        const isCorrect = result.jawabanBenar === result.jawabanPeserta;
+        
+        if (isWinner && isCorrect) {
+          setResultMessage('🏆 LANJUTKAN PERJALANAN!');
+          setResultType('win');
+        } else if (isWinner && !isCorrect) {
+          setResultMessage('💔 ULANGI DARI AWAL!');
+          setResultType('lose');
+        } else {
+          setResultMessage('💔 ULANGI DARI AWAL!');
+          setResultType('lose');
+        }
+      }
+      
+      setShowResult(true);
+      setBattleStatus('Menunggu Pertanyaan');
+      
+      // Auto clear after 5 seconds
+      setTimeout(() => {
+        setActiveBattle(null);
+        setShowResult(false);
+        setResultMessage('');
+        setResultType('');
+      }, 5000);
+    } catch (error) {
+      console.error('Error in handleBattleEnd:', error);
+      setError('Error mengakhiri battle');
+    }
+  }, [user]);
+
+  const handleSubmitAnswer = useCallback(async (answer: string) => {
     if (!user || !activeBattle || isAnswering) return;
     
-    setIsAnswering(true);
-    setSelectedAnswer(answer);
-    
     try {
+      setIsAnswering(true);
+      setSelectedAnswer(answer);
+      setError(''); // Clear previous errors
+      
       // Get submitAnswer function from socket manager
       let submitAnswer = null;
       if (socketManagerRef.current?.submitAnswer) {
@@ -128,33 +167,65 @@ const LombaPage = () => {
         console.log('✅ Answer submitted:', answer);
       } else {
         console.error('❌ submitAnswer function not available');
-        setError('Error submitting answer');
+        setError('Error submitting answer - coba refresh halaman');
       }
     } catch (error) {
       console.error('❌ Error submitting answer:', error);
-      setError('Error submitting answer');
+      setError('Error submitting answer - coba refresh halaman');
     } finally {
       setIsAnswering(false);
     }
-  };
+  }, [user, activeBattle, isAnswering, socketManagerInstance]);
 
-  const handleSocketReady = () => {
-    setSocketManagerReady(true);
-  };
-
-  const handleSocketManagerRef = (ref: any) => {
-    socketManagerRef.current = ref;
-    if (ref) {
-      setSocketManagerInstance(ref);
+  const handleSocketReady = useCallback(() => {
+    try {
+      setSocketManagerReady(true);
+      console.log('✅ Socket manager ready');
+    } catch (error) {
+      console.error('Error in handleSocketReady:', error);
     }
-  };
+  }, []);
 
-  if (!user) {
+  const handleSocketManagerRef = useCallback((ref: any) => {
+    try {
+      socketManagerRef.current = ref;
+      if (ref) {
+        setSocketManagerInstance(ref);
+        console.log('✅ Socket manager ref set');
+      }
+    } catch (error) {
+      console.error('Error setting socket manager ref:', error);
+    }
+  }, []);
+
+  // Loading state
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <div className="text-white text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
           <p>Memuat data peserta...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">Error Loading User</h2>
+          <p className="text-gray-300 mb-4">Gagal memuat data peserta</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg"
+          >
+            Refresh Halaman
+          </button>
         </div>
       </div>
     );
@@ -233,8 +304,8 @@ const LombaPage = () => {
               </p>
               
               <div className="flex items-center justify-center space-x-2 text-sm text-gray-400">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span>Terhubung ke server</span>
+                <div className={`w-2 h-2 rounded-full ${socketManagerReady ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
+                <span>{socketManagerReady ? 'Terhubung ke server' : 'Menghubungkan...'}</span>
               </div>
             </div>
           </motion.div>
@@ -353,22 +424,40 @@ const LombaPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 mb-4"
           >
-            <p className="text-red-200 text-center">{error}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-red-200">{error}</p>
+              <button 
+                onClick={() => setError('')}
+                className="text-red-300 hover:text-red-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </motion.div>
         )}
       </div>
 
-      {/* Socket Manager */}
+      {/* Socket Manager with Error Boundary */}
       {user && (
-        <SocketManager
-          ref={handleSocketManagerRef}
-          user={user}
-          onReady={handleSocketReady}
-          onBattleStart={handleBattleStart}
-          onBattleEnd={handleBattleEnd}
-        />
+        <div className="relative">
+          <SocketManager
+            ref={handleSocketManagerRef}
+            user={user}
+            onReady={handleSocketReady}
+            onBattleStart={handleBattleStart}
+            onBattleEnd={handleBattleEnd}
+          />
+        </div>
       )}
     </div>
+  );
+};
+
+const LombaPage = () => {
+  return (
+    <ErrorBoundary>
+      <LombaPageContent />
+    </ErrorBoundary>
   );
 };
 
