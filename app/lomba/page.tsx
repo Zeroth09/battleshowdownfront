@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Clock, Trophy, X, CheckCircle, XCircle } from 'lucide-react';
+import { Users, Clock, Trophy, X, CheckCircle, XCircle, Play, Home } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import ErrorBoundary from '../../components/ErrorBoundary';
 
 // Dynamic import SocketManager dengan error handling
@@ -54,12 +55,13 @@ const LombaPageContent = () => {
   const [resultMessage, setResultMessage] = useState<string>('');
   const [resultType, setResultType] = useState<'win' | 'lose' | ''>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   
   const socketManagerRef = useRef<any>(null);
   const [socketManagerReady, setSocketManagerReady] = useState<boolean>(false);
-  const [socketManagerInstance, setSocketManagerInstance] = useState<any>(null);
+  const router = useRouter();
 
-  // Load user data from localStorage with error handling
+  // Load user data from localStorage
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem('user');
@@ -67,29 +69,27 @@ const LombaPageContent = () => {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
       } else {
-        // Create default user if none exists
-        const defaultUser: User = {
-          pemainId: `player_${Date.now()}`,
-          nama: `Peserta ${Math.floor(Math.random() * 1000)}`,
-          tim: Math.random() > 0.5 ? 'merah' : 'putih'
-        };
-        setUser(defaultUser);
-        localStorage.setItem('user', JSON.stringify(defaultUser));
+        // Redirect to home if no user data
+        router.push('/');
+        return;
       }
     } catch (error) {
       console.error('Error loading user:', error);
-      // Fallback user
-      const fallbackUser: User = {
-        pemainId: `player_${Date.now()}`,
-        nama: 'Peserta',
-        tim: 'merah'
-      };
-      setUser(fallbackUser);
-      localStorage.setItem('user', JSON.stringify(fallbackUser));
+      router.push('/');
+      return;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [router]);
+
+  const handleSocketReady = () => {
+    setSocketManagerReady(true);
+    setIsConnected(true);
+  };
+
+  const handleLobbyUpdate = (data: { players: User[], count: number }) => {
+    setLobbyPlayers(data.players);
+  };
 
   const handleBattleStart = useCallback((battleData: Battle) => {
     try {
@@ -101,7 +101,7 @@ const LombaPageContent = () => {
       setShowResult(false);
       setResultMessage('');
       setResultType('');
-      setError(''); // Clear any previous errors
+      setError('');
     } catch (error) {
       console.error('Error in handleBattleStart:', error);
       setError('Error memulai battle');
@@ -150,81 +150,47 @@ const LombaPageContent = () => {
     try {
       setIsAnswering(true);
       setSelectedAnswer(answer);
-      setError(''); // Clear previous errors
       
-      // Get submitAnswer function from socket manager
-      let submitAnswer = null;
-      if (socketManagerRef.current?.submitAnswer) {
-        submitAnswer = socketManagerRef.current.submitAnswer;
-      } else if (socketManagerInstance?.submitAnswer) {
-        submitAnswer = socketManagerInstance.submitAnswer;
-      } else if ((window as any).socket?.submitAnswer) {
-        submitAnswer = (window as any).socket.submitAnswer;
+      if (socketManagerRef.current) {
+        await socketManagerRef.current.submitAnswer(activeBattle.id, answer);
       }
       
-      if (submitAnswer) {
-        await submitAnswer(activeBattle.id, answer);
-        console.log('✅ Answer submitted:', answer);
-      } else {
-        console.error('❌ submitAnswer function not available');
-        setError('Error submitting answer - coba refresh halaman');
-      }
+      setBattleStatus('Jawaban Terkirim!');
     } catch (error) {
-      console.error('❌ Error submitting answer:', error);
-      setError('Error submitting answer - coba refresh halaman');
+      console.error('Error submitting answer:', error);
+      setError('Gagal mengirim jawaban');
+      setSelectedAnswer('');
     } finally {
       setIsAnswering(false);
     }
-  }, [user, activeBattle, isAnswering, socketManagerInstance]);
+  }, [user, activeBattle, isAnswering]);
 
-  const handleSocketReady = useCallback(() => {
-    try {
-      setSocketManagerReady(true);
-      console.log('✅ Socket manager ready');
-    } catch (error) {
-      console.error('Error in handleSocketReady:', error);
-    }
-  }, []);
+  const handleBackToHome = () => {
+    localStorage.removeItem('user');
+    router.push('/');
+  };
 
-  const handleSocketManagerRef = useCallback((ref: any) => {
-    try {
-      socketManagerRef.current = ref;
-      if (ref) {
-        setSocketManagerInstance(ref);
-        console.log('✅ Socket manager ref set');
-      }
-    } catch (error) {
-      console.error('Error setting socket manager ref:', error);
-    }
-  }, []);
-
-  // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-center">
+      <div className="min-h-screen bg-gradient-to-br from-red-900 via-purple-900 to-blue-900 flex items-center justify-center">
+        <div className="text-center text-white">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Memuat data peserta...</p>
+          <p>Memuat game...</p>
         </div>
       </div>
     );
   }
 
-  // Error state
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-center">
-          <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <X className="w-8 h-8" />
-          </div>
-          <h2 className="text-xl font-bold mb-2">Error Loading User</h2>
-          <p className="text-gray-300 mb-4">Gagal memuat data peserta</p>
+      <div className="min-h-screen bg-gradient-to-br from-red-900 via-purple-900 to-blue-900 flex items-center justify-center">
+        <div className="text-center text-white">
+          <p>User tidak ditemukan</p>
           <button 
-            onClick={() => window.location.reload()} 
-            className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg"
+            onClick={handleBackToHome}
+            className="mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg"
           >
-            Refresh Halaman
+            Kembali ke Home
           </button>
         </div>
       </div>
@@ -232,222 +198,250 @@ const LombaPageContent = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+    <div className="min-h-screen bg-gradient-to-br from-red-900 via-purple-900 to-blue-900">
       {/* Header */}
       <div className="bg-black/20 backdrop-blur-sm border-b border-white/10">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+        <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-white" />
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                user.tim === 'merah' ? 'bg-red-500' : 'bg-gray-300'
+              }`}>
+                <span className={`font-bold text-lg ${
+                  user.tim === 'merah' ? 'text-white' : 'text-gray-800'
+                }`}>
+                  {user.nama.charAt(0)}
+                </span>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Lomba Battle</h1>
-                <p className="text-sm text-gray-300">Peserta</p>
+                <h1 className="text-xl font-bold text-white">{user.nama}</h1>
+                <p className={`text-sm ${
+                  user.tim === 'merah' ? 'text-red-300' : 'text-gray-300'
+                }`}>
+                  Tim {user.tim}
+                </p>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                user.tim === 'merah' 
-                  ? 'bg-red-500/20 text-red-200 border border-red-500/30' 
-                  : 'bg-white/20 text-white border border-white/30'
+              <div className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                isConnected ? 'bg-green-500/20 text-green-300 border border-green-400' : 'bg-red-500/20 text-red-300 border border-red-400'
               }`}>
-                Tim {user.tim.charAt(0).toUpperCase() + user.tim.slice(1)}
+                {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
               </div>
-              <div className="text-white text-sm">
-                {user.nama}
-              </div>
+              
+              <button
+                onClick={handleBackToHome}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors flex items-center"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Home
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Status */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6 border border-white/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Clock className="w-6 h-6 text-yellow-400" />
-              <div>
-                <h2 className="text-lg font-semibold text-white">{battleStatus}</h2>
-                <p className="text-sm text-gray-300">Siap menjawab pertanyaan</p>
-              </div>
-            </div>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Left Column - Game Area */}
+          <div className="lg:col-span-2 space-y-6">
             
-            <div className="flex items-center space-x-2 text-sm text-gray-300">
-              <Users className="w-4 h-4" />
-              <span>{lobbyPlayers.length} peserta online</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Waiting Room */}
-        {!activeBattle && !showResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20"
-          >
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Users className="w-10 h-10 text-white" />
-              </div>
-              
-              <h2 className="text-2xl font-bold text-white mb-4">
-                Menunggu Pertanyaan
-              </h2>
-              
-              <p className="text-gray-300 mb-6">
-                Bersiaplah! Game Master akan memulai pertanyaan segera.
-              </p>
-              
-              <div className="flex items-center justify-center space-x-2 text-sm text-gray-400">
-                <div className={`w-2 h-2 rounded-full ${socketManagerReady ? 'bg-green-400' : 'bg-yellow-400'} animate-pulse`}></div>
-                <span>{socketManagerReady ? 'Terhubung ke server' : 'Menghubungkan...'}</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Question Modal */}
-        <AnimatePresence>
-          {activeBattle && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            {/* Battle Status */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20"
             >
-              <motion.div
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
-              >
-                <div className="text-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-800 mb-2">
-                    Pertanyaan
-                  </h2>
-                  <p className="text-gray-600">
-                    Jawab dengan cepat dan benar!
-                  </p>
-                </div>
-
-                <div className="mb-6">
-                  <p className="text-lg font-medium text-gray-800 mb-4">
-                    {activeBattle.pertanyaan}
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  {Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
-                    <button
-                      key={key}
-                      onClick={() => handleSubmitAnswer(key)}
-                      disabled={isAnswering}
-                      className={`w-full p-4 rounded-xl text-left transition-all duration-200 ${
-                        selectedAnswer === key
-                          ? 'bg-blue-500 text-white shadow-lg'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
-                      } ${isAnswering ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">
-                          {key.toUpperCase()}. {value}
-                        </span>
-                        {selectedAnswer === key && (
-                          <CheckCircle className="w-5 h-5" />
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                {isAnswering && (
-                  <div className="mt-4 text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
-                    <p className="text-sm text-gray-500 mt-2">Mengirim jawaban...</p>
-                  </div>
-                )}
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Result Modal */}
-        <AnimatePresence>
-          {showResult && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            >
-              <motion.div
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl text-center"
-              >
-                <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
-                  resultType === 'win' 
-                    ? 'bg-green-500' 
-                    : 'bg-red-500'
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center">
+                  <Play className="w-6 h-6 mr-3 text-blue-400" />
+                  Status Game
+                </h2>
+                <div className={`px-4 py-2 rounded-lg font-medium ${
+                  activeBattle 
+                    ? 'bg-green-500/20 text-green-300 border border-green-400' 
+                    : 'bg-gray-500/20 text-gray-300 border border-gray-400'
                 }`}>
-                  {resultType === 'win' ? (
-                    <Trophy className="w-10 h-10 text-white" />
-                  ) : (
-                    <XCircle className="w-10 h-10 text-white" />
+                  {battleStatus}
+                </div>
+              </div>
+
+              {activeBattle ? (
+                <div className="space-y-6">
+                  {/* Question */}
+                  <div className="p-6 bg-white/10 rounded-xl">
+                    <h3 className="text-xl font-semibold text-white mb-4">Pertanyaan:</h3>
+                    <p className="text-gray-200 text-lg mb-6">{activeBattle.pertanyaan}</p>
+                    
+                    {/* Answer Options */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {Object.entries(activeBattle.pilihanJawaban).map(([key, value]) => (
+                        <motion.button
+                          key={key}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleSubmitAnswer(key)}
+                          disabled={isAnswering || selectedAnswer !== ''}
+                          className={`p-4 rounded-xl border-2 text-left transition-all ${
+                            selectedAnswer === key
+                              ? 'border-blue-400 bg-blue-500/30 shadow-lg'
+                              : 'border-white/30 bg-white/10 hover:bg-white/20'
+                          } ${
+                            isAnswering || selectedAnswer !== '' ? 'cursor-not-allowed' : 'cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              selectedAnswer === key ? 'bg-blue-500' : 'bg-white/20'
+                            }`}>
+                              <span className={`font-bold ${
+                                selectedAnswer === key ? 'text-white' : 'text-gray-300'
+                              }`}>
+                                {key.toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="text-white font-medium">{value}</span>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Result */}
+                  {showResult && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`p-6 rounded-xl border-2 ${
+                        resultType === 'win' 
+                          ? 'border-green-400 bg-green-500/20' 
+                          : 'border-red-400 bg-red-500/20'
+                      }`}
+                    >
+                      <div className="text-center">
+                        {resultType === 'win' ? (
+                          <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+                        ) : (
+                          <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                        )}
+                        <h3 className={`text-2xl font-bold mb-2 ${
+                          resultType === 'win' ? 'text-green-300' : 'text-red-300'
+                        }`}>
+                          {resultMessage}
+                        </h3>
+                        <p className="text-gray-300">
+                          {resultType === 'win' 
+                            ? 'Selamat! Kamu berhasil menjawab dengan benar!' 
+                            : 'Jangan menyerah! Coba lagi pertanyaan berikutnya!'
+                          }
+                        </p>
+                      </div>
+                    </motion.div>
                   )}
                 </div>
-
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                  {resultType === 'win' ? 'MENANG!' : 'KALAH!'}
-                </h2>
-
-                <p className="text-lg font-medium text-gray-600 mb-6">
-                  {resultMessage}
-                </p>
-
-                <div className="text-sm text-gray-500">
-                  Menunggu pertanyaan berikutnya...
+              ) : (
+                <div className="text-center py-16">
+                  <Play className="w-20 h-20 text-gray-500 mx-auto mb-6" />
+                  <h3 className="text-2xl font-bold text-white mb-4">Menunggu Pertanyaan</h3>
+                  <p className="text-gray-400 text-lg">Game Master akan memulai pertanyaan segera</p>
+                  <p className="text-gray-500 text-sm mt-2">Pastikan kamu sudah terhubung ke server</p>
                 </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              )}
 
-        {/* Error Display */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 mb-4"
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-red-200">{error}</p>
-              <button 
-                onClick={() => setError('')}
-                className="text-red-300 hover:text-red-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </motion.div>
-        )}
+              {error && (
+                <div className="mt-4 p-4 bg-red-500/20 border border-red-400 rounded-lg">
+                  <p className="text-red-200 text-center">{error}</p>
+                </div>
+              )}
+            </motion.div>
+          </div>
+
+          {/* Right Column - Player List */}
+          <div className="space-y-6">
+            
+            {/* Player Count */}
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20"
+            >
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center">
+                <Users className="w-5 h-5 mr-2 text-blue-400" />
+                Peserta Online
+              </h2>
+              
+              <div className="text-center">
+                <div className="text-4xl font-bold text-white mb-2">{lobbyPlayers.length}</div>
+                <p className="text-gray-300 text-sm">Peserta aktif</p>
+              </div>
+            </motion.div>
+
+            {/* Player List */}
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20"
+            >
+              <h2 className="text-xl font-bold text-white mb-4 flex items-center">
+                <Users className="w-5 h-5 mr-2 text-blue-400" />
+                Daftar Peserta
+              </h2>
+
+              {lobbyPlayers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm">Belum ada peserta</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {lobbyPlayers.map((player, index) => (
+                    <motion.div
+                      key={player.pemainId}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`p-3 rounded-lg border-2 ${
+                        player.tim === 'merah' 
+                          ? 'bg-red-500/20 border-red-400' 
+                          : 'bg-gray-500/20 border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-3 h-3 rounded-full ${
+                          player.tim === 'merah' ? 'bg-red-500' : 'bg-gray-300'
+                        }`}></div>
+                        <div className="flex-1">
+                          <p className={`font-semibold ${
+                            player.tim === 'merah' ? 'text-red-200' : 'text-gray-200'
+                          }`}>
+                            {player.nama}
+                          </p>
+                          <p className="text-gray-400 text-xs">Tim {player.tim}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </div>
+        </div>
       </div>
 
-      {/* Socket Manager with Error Boundary */}
+      {/* Socket Manager */}
       {user && (
-        <div className="relative">
-          <SocketManager
-            ref={handleSocketManagerRef}
-            user={user}
-            onReady={handleSocketReady}
-            onBattleStart={handleBattleStart}
-            onBattleEnd={handleBattleEnd}
-          />
-        </div>
+        <SocketManager
+          ref={socketManagerRef}
+          user={user}
+          onReady={handleSocketReady}
+          onBattleStart={handleBattleStart}
+          onBattleEnd={handleBattleEnd}
+        />
       )}
     </div>
   );
