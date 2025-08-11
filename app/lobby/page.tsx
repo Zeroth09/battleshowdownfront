@@ -1,32 +1,62 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Clock, Trophy, Zap, AlertCircle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import SocketManager, { SocketManagerRef } from '../../components/SocketManager';
 
 interface PemainData {
+  pemainId: string;
   nama: string;
-  tim: string;
+  tim: 'merah' | 'putih';
   masukAt: string;
+  lokasi?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface Pertanyaan {
   id: string;
   pertanyaan: string;
-  pilihan: string[];
+  pilihanJawaban: {
+    a: string;
+    b: string;
+    c: string;
+    d: string;
+  };
+  jawabanBenar: string;
   waktu: number;
+}
+
+interface Battle {
+  id: string;
+  pertanyaan: string;
+  pilihanJawaban: {
+    a: string;
+    b: string;
+    c: string;
+    d: string;
+  };
+  jawabanBenar: string;
+  lawan: {
+    nama: string;
+    tim: string;
+  };
 }
 
 export default function LobbyPage() {
   const [pemainData, setPemainData] = useState<PemainData | null>(null);
   const [pemainLain, setPemainLain] = useState<PemainData[]>([]);
   const [status, setStatus] = useState<'menunggu' | 'pertanyaan' | 'hasil'>('menunggu');
-  const [pertanyaan, setPertanyaan] = useState<Pertanyaan | null>(null);
+  const [pertanyaan, setPertanyaan] = useState<Battle | null>(null);
   const [waktuTersisa, setWaktuTersisa] = useState(0);
   const [jawabanDipilih, setJawabanDipilih] = useState<string | null>(null);
   const [hasil, setHasil] = useState<any>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const router = useRouter();
+  const socketRef = useRef<SocketManagerRef>(null);
 
   useEffect(() => {
     // Ambil data pemain dari localStorage
@@ -38,28 +68,54 @@ export default function LobbyPage() {
 
     const parsedData = JSON.parse(data);
     setPemainData(parsedData);
-
-    // Simulasi pemain lain (nanti bisa dari WebSocket)
-    setPemainLain([
-      { nama: 'Budi', tim: 'merah', masukAt: new Date().toISOString() },
-      { nama: 'Sari', tim: 'putih', masukAt: new Date().toISOString() },
-      { nama: 'Rudi', tim: 'merah', masukAt: new Date().toISOString() },
-      { nama: 'Dewi', tim: 'putih', masukAt: new Date().toISOString() },
-    ]);
-
-    // Simulasi pertanyaan dari game master (nanti bisa dari WebSocket)
-    setTimeout(() => {
-      setPertanyaan({
-        id: '1',
-        pertanyaan: 'Apa ibukota Indonesia?',
-        pilihan: ['Jakarta', 'Bandung', 'Surabaya', 'Yogyakarta'],
-        waktu: 30
-      });
-      setStatus('pertanyaan');
-      setWaktuTersisa(30);
-    }, 5000);
   }, [router]);
 
+  const handleReady = () => {
+    console.log('✅ Socket ready');
+    setIsConnected(true);
+  };
+
+  const handleBattleStart = (battleData: Battle) => {
+    console.log('⚔️ Battle started:', battleData);
+    setPertanyaan(battleData);
+    setStatus('pertanyaan');
+    setWaktuTersisa(30); // Default waktu 30 detik
+    setJawabanDipilih(null);
+    setHasil(null);
+  };
+
+  const handleBattleEnd = (result: any) => {
+    console.log('🏁 Battle finished:', result);
+    setStatus('hasil');
+    setHasil(result);
+    setPertanyaan(null);
+  };
+
+  const handleLiveAnswer = (answerData: any) => {
+    console.log('👁️ Live answer received:', answerData);
+    // Update real-time player answers
+  };
+
+  const handleJawab = async (jawaban: string) => {
+    if (!socketRef.current || !pertanyaan) return;
+    
+    try {
+      setJawabanDipilih(jawaban);
+      await socketRef.current.submitAnswer(pertanyaan.id, jawaban);
+    } catch (error) {
+      console.error('Error submitting answer:', error);
+    }
+  };
+
+  const handleLanjutkan = () => {
+    // Reset untuk pertanyaan berikutnya
+    setStatus('menunggu');
+    setPertanyaan(null);
+    setJawabanDipilih(null);
+    setHasil(null);
+  };
+
+  // Timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
@@ -69,11 +125,6 @@ export default function LobbyPage() {
           if (prev <= 1) {
             // Waktu habis, tunjukkan hasil
             setStatus('hasil');
-            setHasil({
-              jawabanBenar: 'Jakarta',
-              skorTim: { merah: 85, putih: 92 },
-              pemenang: 'putih'
-            });
             return 0;
           }
           return prev - 1;
@@ -86,36 +137,22 @@ export default function LobbyPage() {
     };
   }, [status, waktuTersisa]);
 
-  const handleJawab = (jawaban: string) => {
-    setJawabanDipilih(jawaban);
-  };
-
-  const handleLanjutkan = () => {
-    // Reset untuk pertanyaan berikutnya
-    setStatus('menunggu');
-    setPertanyaan(null);
-    setJawabanDipilih(null);
-    setHasil(null);
-    
-    // Simulasi pertanyaan berikutnya
-    setTimeout(() => {
-      setPertanyaan({
-        id: '2',
-        pertanyaan: 'Berapa hasil dari 7 x 8?',
-        pilihan: ['54', '56', '58', '60'],
-        waktu: 25
-      });
-      setStatus('pertanyaan');
-      setWaktuTersisa(25);
-    }, 3000);
-  };
-
   if (!pemainData) {
     return <div>Loading...</div>;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100">
+      {/* Socket Manager */}
+      <SocketManager
+        ref={socketRef}
+        user={pemainData}
+        onReady={handleReady}
+        onBattleStart={handleBattleStart}
+        onBattleEnd={handleBattleEnd}
+        onLiveAnswer={handleLiveAnswer}
+      />
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-red-100">
         <div className="container mx-auto px-4 py-4">
@@ -131,8 +168,14 @@ export default function LobbyPage() {
                 Tim {pemainData.tim === 'merah' ? 'Merah' : 'Putih'}
               </span>
             </div>
-            <div className="text-sm text-gray-500">
-              Lobby Battle
+            <div className="flex items-center space-x-3">
+              <div className={`flex items-center space-x-2 ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm font-medium">
+                  {isConnected ? 'Terhubung' : 'Terputus'}
+                </span>
+              </div>
+              <span className="text-sm text-gray-500">Lobby Battle</span>
             </div>
           </div>
         </div>
@@ -196,9 +239,9 @@ export default function LobbyPage() {
                     
                     {/* Pilihan Jawaban */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {pertanyaan.pilihan.map((pilihan, index) => (
+                      {Object.entries(pertanyaan.pilihanJawaban).map(([key, pilihan]) => (
                         <motion.button
-                          key={index}
+                          key={key}
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => handleJawab(pilihan)}
@@ -241,11 +284,9 @@ export default function LobbyPage() {
                 >
                   <div className="text-center">
                     <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 ${
-                      hasil.pemenang === pemainData.tim 
-                        ? 'bg-green-500' 
-                        : 'bg-red-500'
+                      hasil.isCorrect ? 'bg-green-500' : 'bg-red-500'
                     }`}>
-                      {hasil.pemenang === pemainData.tim ? (
+                      {hasil.isCorrect ? (
                         <Trophy className="w-10 h-10 text-white" />
                       ) : (
                         <AlertCircle className="w-10 h-10 text-white" />
@@ -253,17 +294,15 @@ export default function LobbyPage() {
                     </div>
                     
                     <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                      {hasil.pemenang === pemainData.tim ? 'Tim Kamu Menang! 🎉' : 'Tim Kamu Kalah 😔'}
+                      {hasil.isCorrect ? 'Jawaban Benar! 🎉' : 'Jawaban Salah 😔'}
                     </h2>
                     
-                    <div className="grid grid-cols-2 gap-6 mb-8">
-                      <div className="bg-red-50 rounded-xl p-4">
-                        <div className="text-2xl font-bold text-red-600">{hasil.skorTim.merah}</div>
-                        <div className="text-sm text-red-700">Tim Merah</div>
+                    <div className="bg-gray-50 rounded-xl p-6 mb-8">
+                      <div className="text-lg text-gray-700 mb-2">
+                        <strong>Jawaban Kamu:</strong> {hasil.jawabanPeserta}
                       </div>
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <div className="text-2xl font-bold text-gray-600">{hasil.skorTim.putih}</div>
-                        <div className="text-sm text-gray-700">Tim Putih</div>
+                      <div className="text-lg text-green-700">
+                        <strong>Jawaban Benar:</strong> {hasil.jawabanBenar}
                       </div>
                     </div>
 
@@ -298,7 +337,7 @@ export default function LobbyPage() {
                   <span className="text-xs text-gray-500">(Kamu)</span>
                 </div>
 
-                {/* Pemain lain */}
+                {/* Pemain lain akan diupdate via WebSocket */}
                 {pemainLain.map((pemain, index) => (
                   <motion.div
                     key={index}
@@ -311,6 +350,12 @@ export default function LobbyPage() {
                     <span className="font-medium text-gray-900">{pemain.nama}</span>
                   </motion.div>
                 ))}
+
+                {pemainLain.length === 0 && (
+                  <div className="text-center py-4 text-gray-500">
+                    <p>Belum ada pemain lain</p>
+                  </div>
+                )}
               </div>
 
               {/* Status Game */}

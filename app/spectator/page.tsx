@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Eye, 
@@ -10,9 +10,11 @@ import {
   ArrowLeft,
   TrendingUp,
   BarChart3,
-  Target
+  Target,
+  Zap
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import SocketManager, { SocketManagerRef } from '../../components/SocketManager';
 
 interface Pemain {
   id: string;
@@ -24,12 +26,20 @@ interface Pemain {
   waktuJawab?: number;
 }
 
-interface Pertanyaan {
+interface Battle {
   id: string;
   pertanyaan: string;
-  pilihan: string[];
+  pilihanJawaban: {
+    a: string;
+    b: string;
+    c: string;
+    d: string;
+  };
   jawabanBenar: string;
-  waktu: number;
+  lawan: {
+    nama: string;
+    tim: string;
+  };
 }
 
 interface StatistikTim {
@@ -56,7 +66,7 @@ interface HasilPertanyaan {
 
 export default function SpectatorPage() {
   const [pemain, setPemain] = useState<Pemain[]>([]);
-  const [pertanyaanAktif, setPertanyaanAktif] = useState<Pertanyaan | null>(null);
+  const [pertanyaanAktif, setPertanyaanAktif] = useState<Battle | null>(null);
   const [statusGame, setStatusGame] = useState<'menunggu' | 'pertanyaan' | 'hasil'>('menunggu');
   const [waktuTersisa, setWaktuTersisa] = useState(0);
   const [statistikTim, setStatistikTim] = useState<StatistikTim>({
@@ -64,56 +74,92 @@ export default function SpectatorPage() {
     putih: { totalSkor: 0, pemainCount: 0, rataRataSkor: 0, jawabanBenar: 0 }
   });
   const [hasilPertanyaan, setHasilPertanyaan] = useState<HasilPertanyaan | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [liveAnswers, setLiveAnswers] = useState<any[]>([]);
   const router = useRouter();
+  const socketRef = useRef<SocketManagerRef>(null);
 
-  useEffect(() => {
-    // Simulasi data pemain
-    const dataPemain: Pemain[] = [
-      { id: '1', nama: 'Budi', tim: 'merah', skor: 85, status: 'online' },
-      { id: '2', nama: 'Sari', tim: 'putih', skor: 92, status: 'online' },
-      { id: '3', nama: 'Rudi', tim: 'merah', skor: 78, status: 'online' },
-      { id: '4', nama: 'Dewi', tim: 'putih', skor: 88, status: 'online' },
-      { id: '5', nama: 'Ahmad', tim: 'merah', skor: 65, status: 'offline' },
-      { id: '6', nama: 'Nina', tim: 'putih', skor: 95, status: 'online' },
-      { id: '7', nama: 'Joko', tim: 'merah', skor: 72, status: 'online' },
-      { id: '8', nama: 'Maya', tim: 'putih', skor: 81, status: 'online' },
-    ];
-    
-    setPemain(dataPemain);
+  // Mock user data untuk spectator (nanti bisa dari auth)
+  const spectatorUser = {
+    pemainId: 'spectator-001',
+    nama: 'Spectator',
+    tim: 'merah' as const
+  };
 
-    // Hitung statistik tim
-    const merah = dataPemain.filter(p => p.tim === 'merah');
-    const putih = dataPemain.filter(p => p.tim === 'putih');
+  const handleReady = () => {
+    console.log('✅ Socket ready for Spectator');
+    setIsConnected(true);
+  };
+
+  const handleBattleStart = (battleData: Battle) => {
+    console.log('⚔️ Battle started:', battleData);
+    setPertanyaanAktif(battleData);
+    setStatusGame('pertanyaan');
+    setWaktuTersisa(30); // Default waktu
+    setLiveAnswers([]);
+    setHasilPertanyaan(null);
+  };
+
+  const handleBattleEnd = (result: any) => {
+    console.log('🏁 Battle finished:', result);
+    setStatusGame('hasil');
+    setPertanyaanAktif(null);
     
-    setStatistikTim({
-      merah: {
-        totalSkor: merah.reduce((sum, p) => sum + p.skor, 0),
-        pemainCount: merah.length,
-        rataRataSkor: Math.round(merah.reduce((sum, p) => sum + p.skor, 0) / merah.length),
-        jawabanBenar: Math.floor(Math.random() * 15) + 10
-      },
-      putih: {
-        totalSkor: putih.reduce((sum, p) => sum + p.skor, 0),
-        pemainCount: putih.length,
-        rataRataSkor: Math.round(putih.reduce((sum, p) => sum + p.skor, 0) / putih.length),
-        jawabanBenar: Math.floor(Math.random() * 15) + 10
+    // Buat hasil pertanyaan dari live answers
+    if (liveAnswers.length > 0) {
+      const statistikJawaban: Record<string, number> = {};
+      liveAnswers.forEach(answer => {
+        statistikJawaban[answer.jawaban] = (statistikJawaban[answer.jawaban] || 0) + 1;
+      });
+
+      setHasilPertanyaan({
+        jawabanBenar: result.jawabanBenar,
+        skorTim: { merah: 0, putih: 0 }, // Nanti bisa dihitung dari live answers
+        pemenang: result.pemenang?.tim || 'merah',
+        statistikJawaban
+      });
+    }
+  };
+
+  const handleLiveAnswer = (answerData: any) => {
+    console.log('👁️ Live answer received:', answerData);
+    setLiveAnswers(prev => [...prev, answerData]);
+    
+    // Update statistik tim
+    setStatistikTim(prev => {
+      const tim = answerData.tim;
+      const isCorrect = answerData.jawaban === pertanyaanAktif?.jawabanBenar;
+      
+      if (tim === 'merah') {
+        return {
+          ...prev,
+          merah: {
+            ...prev.merah,
+            jawabanBenar: prev.merah.jawabanBenar + (isCorrect ? 1 : 0),
+            totalSkor: prev.merah.totalSkor + (isCorrect ? 10 : 0)
+          }
+        };
+      } else {
+        return {
+          ...prev,
+          putih: {
+            ...prev.putih,
+            jawabanBenar: prev.putih.jawabanBenar + (isCorrect ? 1 : 0),
+            totalSkor: prev.putih.totalSkor + (isCorrect ? 10 : 0)
+          }
+        };
       }
     });
+  };
 
-    // Simulasi pertanyaan aktif
-    setTimeout(() => {
-      setPertanyaanAktif({
-        id: '1',
-        pertanyaan: 'Apa ibukota Indonesia?',
-        pilihan: ['Jakarta', 'Bandung', 'Surabaya', 'Yogyakarta'],
-        jawabanBenar: 'Jakarta',
-        waktu: 30
-      });
-      setStatusGame('pertanyaan');
-      setWaktuTersisa(30);
-    }, 3000);
-  }, []);
+  const handleLanjutkan = () => {
+    setStatusGame('menunggu');
+    setPertanyaanAktif(null);
+    setHasilPertanyaan(null);
+    setLiveAnswers([]);
+  };
 
+  // Timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
@@ -121,19 +167,8 @@ export default function SpectatorPage() {
       interval = setInterval(() => {
         setWaktuTersisa(prev => {
           if (prev <= 1) {
-            // Waktu habis, tunjukkan hasil
+            // Waktu habis, game selesai
             setStatusGame('hasil');
-            setHasilPertanyaan({
-              jawabanBenar: 'Jakarta',
-              skorTim: { merah: 85, putih: 92 },
-              pemenang: 'putih',
-              statistikJawaban: {
-                'Jakarta': 12,
-                'Bandung': 3,
-                'Surabaya': 2,
-                'Yogyakarta': 1
-              }
-            });
             return 0;
           }
           return prev - 1;
@@ -146,27 +181,18 @@ export default function SpectatorPage() {
     };
   }, [statusGame, waktuTersisa]);
 
-  const handleLanjutkan = () => {
-    setStatusGame('menunggu');
-    setPertanyaanAktif(null);
-    setHasilPertanyaan(null);
-    
-    // Simulasi pertanyaan berikutnya
-    setTimeout(() => {
-      setPertanyaanAktif({
-        id: '2',
-        pertanyaan: 'Berapa hasil dari 7 x 8?',
-        pilihan: ['54', '56', '58', '60'],
-        jawabanBenar: '56',
-        waktu: 25
-      });
-      setStatusGame('pertanyaan');
-      setWaktuTersisa(25);
-    }, 3000);
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-100">
+      {/* Socket Manager */}
+      <SocketManager
+        ref={socketRef}
+        user={spectatorUser}
+        onReady={handleReady}
+        onBattleStart={handleBattleStart}
+        onBattleEnd={handleBattleEnd}
+        onLiveAnswer={handleLiveAnswer}
+      />
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-red-100">
         <div className="container mx-auto px-4 py-4">
@@ -186,8 +212,14 @@ export default function SpectatorPage() {
                 <p className="text-sm text-gray-500">Lihat game dari sisi penonton</p>
               </div>
             </div>
-            <div className="text-sm text-gray-500">
-              Live View
+            <div className="flex items-center space-x-3">
+              <div className={`flex items-center space-x-2 ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm font-medium">
+                  {isConnected ? 'Terhubung' : 'Terputus'}
+                </span>
+              </div>
+              <span className="text-sm text-gray-500">Live View</span>
             </div>
           </div>
         </div>
@@ -246,9 +278,9 @@ export default function SpectatorPage() {
                     
                     {/* Pilihan Jawaban */}
                     <div className="grid grid-cols-2 gap-4">
-                      {pertanyaanAktif.pilihan.map((pilihan, index) => (
+                      {Object.entries(pertanyaanAktif.pilihanJawaban).map(([key, pilihan]) => (
                         <div
-                          key={index}
+                          key={key}
                           className={`p-6 rounded-xl border-2 transition-all duration-200 ${
                             pilihan === pertanyaanAktif.jawabanBenar
                               ? 'border-green-500 bg-green-50'
@@ -256,7 +288,7 @@ export default function SpectatorPage() {
                           }`}
                         >
                           <span className="font-semibold text-lg text-gray-900">
-                            {String.fromCharCode(65 + index)}. {pilihan}
+                            {key.toUpperCase()}. {pilihan}
                           </span>
                           {pilihan === pertanyaanAktif.jawabanBenar && (
                             <div className="mt-2 text-green-600 font-bold">✓ Jawaban Benar</div>
@@ -265,6 +297,28 @@ export default function SpectatorPage() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Live Answers */}
+                  {liveAnswers.length > 0 && (
+                    <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                      <h3 className="font-semibold text-blue-900 mb-3">Jawaban Live ({liveAnswers.length})</h3>
+                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {liveAnswers.slice(-5).map((answer, index) => (
+                          <div key={index} className="flex items-center justify-between text-sm">
+                            <span className="text-blue-800">{answer.nama}</span>
+                            <span className="text-blue-600">{answer.jawaban}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              answer.jawaban === pertanyaanAktif?.jawabanBenar
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {answer.jawaban === pertanyaanAktif?.jawabanBenar ? '✓' : '✗'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
 
@@ -317,6 +371,43 @@ export default function SpectatorPage() {
 
           {/* Sidebar - Statistik & Pemain */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Connection Status */}
+            <div className="bg-white rounded-3xl shadow-xl p-6 border border-red-100">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
+                <Zap className="w-5 h-5 text-red-600 mr-2" />
+                Status Koneksi
+              </h3>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <span className="font-medium text-gray-900">Socket Status</span>
+                  <div className={`flex items-center space-x-2 ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-sm font-medium">
+                      {isConnected ? 'Terhubung' : 'Terputus'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <span className="font-medium text-gray-900">Game Status</span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    statusGame === 'menunggu' ? 'bg-gray-100 text-gray-700' :
+                    statusGame === 'pertanyaan' ? 'bg-green-100 text-green-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {statusGame === 'menunggu' ? 'Menunggu' : 
+                     statusGame === 'pertanyaan' ? 'Pertanyaan' : 'Hasil'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <span className="font-medium text-gray-900">Live Answers</span>
+                  <span className="text-sm font-medium text-blue-600">{liveAnswers.length}</span>
+                </div>
+              </div>
+            </div>
+
             {/* Statistik Tim */}
             <div className="bg-white rounded-3xl shadow-xl p-6 border border-red-100">
               <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
@@ -391,33 +482,14 @@ export default function SpectatorPage() {
               )}
             </div>
 
-            {/* Daftar Pemain */}
-            <div className="bg-white rounded-3xl shadow-xl p-6 border border-red-100">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
-                <Users className="w-5 h-5 text-red-600 mr-2" />
-                Daftar Pemain ({pemain.filter(p => p.status === 'online').length} online)
-              </h3>
-              
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {pemain.map((pemainItem) => (
-                  <div key={pemainItem.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${pemainItem.tim === 'merah' ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-                      <span className="font-medium text-gray-900">{pemainItem.nama}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        pemainItem.tim === 'merah' 
-                          ? 'bg-red-100 text-red-700' 
-                          : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {pemainItem.tim === 'merah' ? 'Merah' : 'Putih'}
-                      </span>
-                      <span className="text-sm text-gray-500">{pemainItem.skor}</span>
-                      <div className={`w-2 h-2 rounded-full ${pemainItem.status === 'online' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                    </div>
-                  </div>
-                ))}
+            {/* Info Spectator */}
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-3xl p-6 border border-blue-200">
+              <h3 className="font-semibold text-blue-900 mb-3">👁️ Mode Spectator</h3>
+              <div className="space-y-2 text-sm text-blue-800">
+                <p>• Lihat pertanyaan secara realtime</p>
+                <p>• Monitor jawaban pemain live</p>
+                <p>• Statistik tim realtime</p>
+                <p>• Tidak bisa ikut bermain</p>
               </div>
             </div>
           </div>

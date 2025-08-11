@@ -5,6 +5,9 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 
+// Import routes
+const pertanyaanSheetsRoutes = require('./routes/pertanyaan-sheets');
+
 dotenv.config();
 
 const app = express();
@@ -148,6 +151,32 @@ function debounceLocationUpdate(pemainId, location) {
 }
 
 // Routes
+app.use('/api/pertanyaan/sheets', pertanyaanSheetsRoutes);
+
+// Route untuk pertanyaan random
+app.get('/api/pertanyaan/random', async (req, res) => {
+  try {
+    const pertanyaan = await ambilPertanyaanRandom();
+    if (!pertanyaan) {
+      return res.status(404).json({
+        sukses: false,
+        pesan: 'Tidak ada pertanyaan tersedia'
+      });
+    }
+    
+    res.json({
+      sukses: true,
+      data: pertanyaan
+    });
+  } catch (error) {
+    console.error('Error getting random pertanyaan:', error);
+    res.status(500).json({
+      sukses: false,
+      pesan: 'Terjadi kesalahan server'
+    });
+  }
+});
+
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Battle Showdown Backend API',
