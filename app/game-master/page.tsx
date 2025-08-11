@@ -65,7 +65,8 @@ export default function GameMasterPage() {
   const getPertanyaanRandom = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/pertanyaan/sheets/random');
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+      const response = await fetch(`${backendUrl}/api/pertanyaan/sheets/random`);
       if (response.ok) {
         const data = await response.json();
         if (data.sukses && data.data) {
