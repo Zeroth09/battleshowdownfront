@@ -20,11 +20,19 @@ console.log('GOOGLE_PRIVATE_KEY:', process.env.GOOGLE_PRIVATE_KEY ? '✅ Set' : 
 
 const app = express();
 const server = http.createServer(app);
+
+// Improved CORS configuration for Socket.IO
 const io = socketIo(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+    origin: ["http://localhost:3000", "http://127.0.0.1:3000", "https://battleshowdownfront.vercel.app"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+    transports: ['websocket', 'polling']
+  },
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 // Google Sheets setup
@@ -58,7 +66,12 @@ async function initializeGoogleSheets() {
 initializeGoogleSheets();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:3000", "http://127.0.0.1:3000", "https://battleshowdownfront.vercel.app"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
 app.use(express.json());
 
 // In-memory storage
