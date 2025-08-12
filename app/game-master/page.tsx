@@ -156,9 +156,9 @@ export default function GameMasterPage() {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-6xl mx-auto">
           {/* Main Control Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-3xl shadow-2xl p-8 border border-red-100 mb-8"
           >
             <div className="text-center">
@@ -195,8 +195,8 @@ export default function GameMasterPage() {
                   </div>
                   <p className="text-sm text-gray-500">Waktu Tersisa</p>
                 </div>
-              </div>
-              
+                  </div>
+                  
               {/* Main Action Buttons */}
               <div className="flex items-center justify-center space-x-6">
                 {statusGame === 'idle' ? (
@@ -226,11 +226,11 @@ export default function GameMasterPage() {
                     <div className="flex items-center space-x-3">
                       <Square className="w-6 h-6" />
                       <span>Stop Game!</span>
-                    </div>
+                </div>
                   </motion.button>
-                )}
-              </div>
-              
+              )}
+            </div>
+
               <p className="text-sm text-gray-500 mt-4">
                 {statusGame === 'idle' 
                   ? 'Klik untuk memulai game global dengan pertanyaan otomatis'
@@ -331,9 +331,9 @@ export default function GameMasterPage() {
                 Semua peserta vs sistem
               </p>
             </motion.div>
-          </div>
+            </div>
 
-          {/* Info Panel */}
+            {/* Info Panel */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -355,7 +355,7 @@ export default function GameMasterPage() {
               <p className="text-sm text-red-800">
                 <strong>Note:</strong> Game Master hanya mengontrol mulai/stop game. Pertanyaan dan gameplay diatur otomatis oleh sistem.
               </p>
-            </div>
+          </div>
           </motion.div>
         </div>
       </div>
