@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Socket Connection - Battle Showdown</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+        }
+        .player-card {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .connected { background: #4CAF50; }
+        .disconnected { background: #f44336; }
+        .waiting { background: #ff9800; }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #45a049; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
+        input, select {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin: 5px;
+        }
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .player-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Socket Connection - Battle Showdown</h1>
+    
+    <div class="container">
+        <h2>🎮 Buat Pemain Baru</h2>
+        <div>
+            <input type="text" id="playerName" placeholder="Nama Pemain" value="Test Player">
+            <select id="playerTeam">
+                <option value="merah">Tim Merah</option>
+                <option value="putih">Tim Putih</option>
+            </select>
+            <button onclick="createPlayer()">Buat Pemain</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>👥 Daftar Pemain Aktif</h2>
+        <div id="playerList" class="player-list"></div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Status Koneksi</h2>
+        <div id="connectionStatus"></div>
+    </div>
+
+    <div class="container">
+        <h2>📝 Log Events</h2>
+        <div id="eventLog" class="log"></div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'http://localhost:5000';
+        const players = new Map();
+        let globalSocket = null;
+
+        function log(message) {
+            const logDiv = document.getElementById('eventLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function createPlayer() {
+            const name = document.getElementById('playerName').value;
+            const team = document.getElementById('playerTeam').value;
+            
+            if (!name.trim()) {
+                alert('Masukkan nama pemain!');
+                return;
+            }
+
+            const playerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const player = {
+                id: playerId,
+                name: name,
+                team: team,
+                socket: null,
+                connected: false,
+                joinedAt: new Date()
+            };
+
+            players.set(playerId, player);
+            log(`✅ Pemain baru dibuat: ${name} (${team})`);
+            updatePlayerList();
+            connectPlayer(player);
+        }
+
+        function connectPlayer(player) {
+            try {
+                log(`🔌 Mencoba menghubungkan ${player.name}...`);
+                
+                const socket = io(BACKEND_URL, {
+                    transports: ['websocket', 'polling'],
+                    timeout: 20000,
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000,
+                    forceNew: true,
+                });
+
+                socket.on('connect', () => {
+                    log(`✅ ${player.name} terhubung ke server`);
+                    player.connected = true;
+                    player.socket = socket;
+                    
+                    // Join lobby
+                    socket.emit('join-lobby', {
+                        pemainId: player.id,
+                        nama: player.name,
+                        tim: player.team,
+                        lokasi: { latitude: 0, longitude: 0 }
+                    });
+                    
+                    updatePlayerList();
+                    updateConnectionStatus();
+                });
+
+                socket.on('disconnect', (reason) => {
+                    log(`❌ ${player.name} terputus: ${reason}`);
+                    player.connected = false;
+                    updatePlayerList();
+                    updateConnectionStatus();
+                });
+
+                socket.on('connect_error', (error) => {
+                    log(`❌ ${player.name} error koneksi: ${error.message}`);
+                    player.connected = false;
+                    updatePlayerList();
+                    updateConnectionStatus();
+                });
+
+                socket.on('lobby-update', (data) => {
+                    log(`👥 ${player.name} menerima lobby update: ${data.players?.length || 0} pemain`);
+                    console.log('Lobby update for', player.name, ':', data);
+                });
+
+                socket.on('battle-start', (data) => {
+                    log(`⚔️ ${player.name} battle dimulai: ${data.pertanyaan?.substring(0, 30)}...`);
+                });
+
+                socket.on('battle-selesai', (data) => {
+                    log(`🏁 ${player.name} battle selesai`);
+                });
+
+                socket.on('global-battle-start', (data) => {
+                    log(`👑 ${player.name} global battle dimulai`);
+                });
+
+                socket.on('global-battle-end', (data) => {
+                    log(`👑 ${player.name} global battle selesai`);
+                });
+
+            } catch (error) {
+                log(`❌ Error membuat socket untuk ${player.name}: ${error.message}`);
+            }
+        }
+
+        function disconnectPlayer(playerId) {
+            const player = players.get(playerId);
+            if (player && player.socket) {
+                player.socket.disconnect();
+                log(`🔌 ${player.name} diputuskan secara manual`);
+            }
+        }
+
+        function removePlayer(playerId) {
+            const player = players.get(playerId);
+            if (player && player.socket) {
+                player.socket.disconnect();
+            }
+            players.delete(playerId);
+            log(`🗑️ ${player?.name} dihapus`);
+            updatePlayerList();
+            updateConnectionStatus();
+        }
+
+        function updatePlayerList() {
+            const playerListDiv = document.getElementById('playerList');
+            playerListDiv.innerHTML = '';
+
+            players.forEach((player, playerId) => {
+                const playerCard = document.createElement('div');
+                playerCard.className = 'player-card';
+                
+                const statusClass = player.connected ? 'connected' : 'disconnected';
+                const statusText = player.connected ? 'Terhubung' : 'Terputus';
+                
+                playerCard.innerHTML = `
+                    <h3>${player.name}</h3>
+                    <p><strong>Tim:</strong> ${player.team}</p>
+                    <p><strong>ID:</strong> ${player.id}</p>
+                    <p><strong>Bergabung:</strong> ${player.joinedAt.toLocaleTimeString()}</p>
+                    <span class="status ${statusClass}">${statusText}</span>
+                    <br><br>
+                    <button onclick="disconnectPlayer('${playerId}')" ${!player.connected ? 'disabled' : ''}>
+                        Disconnect
+                    </button>
+                    <button onclick="removePlayer('${playerId}')" style="background: #f44336;">
+                        Hapus
+                    </button>
+                `;
+                
+                playerListDiv.appendChild(playerCard);
+            });
+        }
+
+        function updateConnectionStatus() {
+            const statusDiv = document.getElementById('connectionStatus');
+            const connectedCount = Array.from(players.values()).filter(p => p.connected).length;
+            const totalCount = players.size;
+            
+            statusDiv.innerHTML = `
+                <p><strong>Total Pemain:</strong> ${totalCount}</p>
+                <p><strong>Terhubung:</strong> ${connectedCount}</p>
+                <p><strong>Terputus:</strong> ${totalCount - connectedCount}</p>
+                <p><strong>Backend URL:</strong> ${BACKEND_URL}</p>
+            `;
+        }
+
+        // Auto-create some test players
+        window.onload = function() {
+            log('🚀 Test Socket Connection dimulai');
+            log(`🔗 Backend URL: ${BACKEND_URL}`);
+            
+            // Create initial test players
+            setTimeout(() => {
+                document.getElementById('playerName').value = 'Player 1';
+                document.getElementById('playerTeam').value = 'merah';
+                createPlayer();
+                
+                setTimeout(() => {
+                    document.getElementById('playerName').value = 'Player 2';
+                    document.getElementById('playerTeam').value = 'putih';
+                    createPlayer();
+                }, 1000);
+            }, 500);
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = function() {
+            players.forEach((player) => {
+                if (player.socket) {
+                    player.socket.disconnect();
+                }
+            });
+        };
+    </script>
+</body>
+</html> 
