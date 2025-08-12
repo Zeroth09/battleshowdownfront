@@ -114,13 +114,29 @@ export default function LobbyPage() {
     if (socketRef.current?.socket) {
       const socket = socketRef.current.socket;
       
+      // Debug: Log semua event yang diterima
+      const debugHandler = (eventName: string, data: any) => {
+        console.log(`🔍 [DEBUG] Event received: ${eventName}`, data);
+        log(`🔍 Event: ${eventName}`, data);
+      };
+      
+      // Listen untuk semua event
+      socket.onAny(debugHandler);
+      
+      // Specific handler untuk lobby-update
       socket.on('lobby-update', handleLobbyUpdate);
       
       return () => {
+        socket.offAny(debugHandler);
         socket.off('lobby-update', handleLobbyUpdate);
       };
     }
   }, [socketRef.current?.socket, pemainData?.pemainId]);
+
+  // Debug logging function
+  const log = (message: string, data?: any) => {
+    console.log(`[${pemainData?.nama}] ${message}`, data);
+  };
 
   const handleJawab = async (jawaban: string) => {
     if (!socketRef.current || !pertanyaan) return;

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Multiple Clients - Battle Showdown</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+        }
+        .client-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .client-card {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .connected { background: #4CAF50; }
+        .disconnected { background: #f44336; }
+        .waiting { background: #ff9800; }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 12px;
+        }
+        button:hover { background: #45a049; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
+        input, select {
+            padding: 6px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            margin: 5px;
+            font-size: 12px;
+        }
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            padding: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 11px;
+            margin-top: 10px;
+        }
+        .player-list {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            padding: 8px;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        .player-item {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Multiple Clients - Battle Showdown</h1>
+    
+    <div class="container">
+        <h2>🎮 Kontrol Test</h2>
+        <div class="controls">
+            <input type="number" id="clientCount" placeholder="Jumlah Client" value="3" min="1" max="10">
+            <button onclick="createMultipleClients()">Buat Multiple Clients</button>
+            <button onclick="clearAllClients()">Clear All</button>
+            <button onclick="testLobbyUpdate()">Test Lobby Update</button>
+        </div>
+        <p>Status: <span id="globalStatus">Siap</span></p>
+    </div>
+
+    <div class="container">
+        <h2>📊 Status Global</h2>
+        <div id="globalStats"></div>
+    </div>
+
+    <div class="container">
+        <h2>👥 Client List</h2>
+        <div id="clientGrid" class="client-grid"></div>
+    </div>
+
+    <script>
+        const BACKEND_URL = 'http://localhost:5000';
+        const clients = new Map();
+        let globalStats = {
+            total: 0,
+            connected: 0,
+            disconnected: 0
+        };
+
+        function log(message, clientId = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            
+            if (clientId && clients.has(clientId)) {
+                const client = clients.get(clientId);
+                const logDiv = client.logDiv;
+                logDiv.innerHTML += logMessage + '\n';
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+            
+            console.log(logMessage);
+        }
+
+        function createClient(clientId, name, team) {
+            const client = {
+                id: clientId,
+                name: name,
+                team: team,
+                socket: null,
+                connected: false,
+                joinedAt: new Date(),
+                logDiv: null,
+                playerListDiv: null,
+                lobbyPlayers: []
+            };
+
+            clients.set(clientId, client);
+            log(`✅ Client baru dibuat: ${name} (${team})`, clientId);
+            updateGlobalStats();
+            updateClientGrid();
+            connectClient(client);
+        }
+
+        function connectClient(client) {
+            try {
+                log(`🔌 Mencoba menghubungkan ${client.name}...`, client.id);
+                
+                const socket = io(BACKEND_URL, {
+                    transports: ['websocket', 'polling'],
+                    timeout: 20000,
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000,
+                    forceNew: true,
+                });
+
+                socket.on('connect', () => {
+                    log(`✅ ${client.name} terhubung ke server`, client.id);
+                    client.connected = true;
+                    client.socket = socket;
+                    
+                    // Join lobby
+                    socket.emit('join-lobby', {
+                        pemainId: client.id,
+                        nama: client.name,
+                        tim: client.team,
+                        lokasi: { latitude: 0, longitude: 0 }
+                    });
+                    
+                    updateGlobalStats();
+                    updateClientGrid();
+                });
+
+                socket.on('disconnect', (reason) => {
+                    log(`❌ ${client.name} terputus: ${reason}`, client.id);
+                    client.connected = false;
+                    updateGlobalStats();
+                    updateClientGrid();
+                });
+
+                socket.on('connect_error', (error) => {
+                    log(`❌ ${client.name} error koneksi: ${error.message}`, client.id);
+                    client.connected = false;
+                    updateGlobalStats();
+                    updateClientGrid();
+                });
+
+                socket.on('lobby-update', (data) => {
+                    log(`👥 ${client.name} menerima lobby update: ${data.players?.length || 0} pemain`, client.id);
+                    client.lobbyPlayers = data.players || [];
+                    updateClientGrid();
+                    console.log('Lobby update for', client.name, ':', data);
+                });
+
+                socket.on('battle-start', (data) => {
+                    log(`⚔️ ${client.name} battle dimulai`, client.id);
+                });
+
+                socket.on('battle-selesai', (data) => {
+                    log(`🏁 ${client.name} battle selesai`, client.id);
+                });
+
+            } catch (error) {
+                log(`❌ Error membuat socket untuk ${client.name}: ${error.message}`, client.id);
+            }
+        }
+
+        function createMultipleClients() {
+            const count = parseInt(document.getElementById('clientCount').value) || 3;
+            clearAllClients();
+            
+            for (let i = 1; i <= count; i++) {
+                const clientId = `client_${Date.now()}_${i}`;
+                const name = `Player ${i}`;
+                const team = i % 2 === 0 ? 'putih' : 'merah';
+                
+                setTimeout(() => {
+                    createClient(clientId, name, team);
+                }, i * 500); // Delay untuk menghindari race condition
+            }
+        }
+
+        function clearAllClients() {
+            clients.forEach((client) => {
+                if (client.socket) {
+                    client.socket.disconnect();
+                }
+            });
+            clients.clear();
+            updateGlobalStats();
+            updateClientGrid();
+        }
+
+        function testLobbyUpdate() {
+            if (clients.size === 0) {
+                alert('Buat client terlebih dahulu!');
+                return;
+            }
+            
+            // Simulate manual lobby update
+            clients.forEach((client) => {
+                if (client.connected) {
+                    log(`🧪 Manual test lobby update untuk ${client.name}`, client.id);
+                }
+            });
+        }
+
+        function updateGlobalStats() {
+            globalStats.total = clients.size;
+            globalStats.connected = Array.from(clients.values()).filter(c => c.connected).length;
+            globalStats.disconnected = globalStats.total - globalStats.connected;
+            
+            const statsDiv = document.getElementById('globalStats');
+            statsDiv.innerHTML = `
+                <p><strong>Total Clients:</strong> ${globalStats.total}</p>
+                <p><strong>Terhubung:</strong> ${globalStats.connected}</p>
+                <p><strong>Terputus:</strong> ${globalStats.disconnected}</p>
+                <p><strong>Backend URL:</strong> ${BACKEND_URL}</p>
+            `;
+            
+            document.getElementById('globalStatus').textContent = 
+                globalStats.connected > 0 ? 'Testing...' : 'Siap';
+        }
+
+        function updateClientGrid() {
+            const gridDiv = document.getElementById('clientGrid');
+            gridDiv.innerHTML = '';
+
+            clients.forEach((client, clientId) => {
+                const clientCard = document.createElement('div');
+                clientCard.className = 'client-card';
+                
+                const statusClass = client.connected ? 'connected' : 'disconnected';
+                const statusText = client.connected ? 'Terhubung' : 'Terputus';
+                
+                clientCard.innerHTML = `
+                    <h3>${client.name}</h3>
+                    <p><strong>ID:</strong> ${client.id}</p>
+                    <p><strong>Tim:</strong> ${client.team}</p>
+                    <p><strong>Bergabung:</strong> ${client.joinedAt.toLocaleTimeString()}</p>
+                    <span class="status ${statusClass}">${statusText}</span>
+                    
+                    <div class="player-list">
+                        <strong>Pemain di Lobby (${client.lobbyPlayers.length}):</strong>
+                        ${client.lobbyPlayers.map(p => 
+                            `<div class="player-item">${p.nama} (${p.tim})</div>`
+                        ).join('')}
+                    </div>
+                    
+                    <div class="log" id="log_${clientId}"></div>
+                    
+                    <button onclick="disconnectClient('${clientId}')" ${!client.connected ? 'disabled' : ''}>
+                        Disconnect
+                    </button>
+                    <button onclick="removeClient('${clientId}')" style="background: #f44336;">
+                        Hapus
+                    </button>
+                `;
+                
+                // Store references
+                client.logDiv = clientCard.querySelector(`#log_${clientId}`);
+                client.playerListDiv = clientCard.querySelector('.player-list');
+                
+                gridDiv.appendChild(clientCard);
+            });
+        }
+
+        function disconnectClient(clientId) {
+            const client = clients.get(clientId);
+            if (client && client.socket) {
+                client.socket.disconnect();
+                log(`🔌 ${client.name} diputuskan secara manual`, clientId);
+            }
+        }
+
+        function removeClient(clientId) {
+            const client = clients.get(clientId);
+            if (client && client.socket) {
+                client.socket.disconnect();
+            }
+            clients.delete(clientId);
+            log(`🗑️ ${client?.name} dihapus`);
+            updateGlobalStats();
+            updateClientGrid();
+        }
+
+        // Auto-create test clients on load
+        window.onload = function() {
+            log('🚀 Test Multiple Clients dimulai');
+            log(`🔗 Backend URL: ${BACKEND_URL}`);
+            
+            // Create initial test clients
+            setTimeout(() => {
+                createMultipleClients();
+            }, 1000);
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = function() {
+            clients.forEach((client) => {
+                if (client.socket) {
+                    client.socket.disconnect();
+                }
+            });
+        };
+    </script>
+</body>
+</html> 
